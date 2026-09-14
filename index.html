@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Work Hours" />
+  <meta name="description" content="Simple work-hours tracker with calendar, weekly totals and monthly totals." />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <title>Work Hours Tracker</title>
+  <style>
+    :root{
+      --bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--line:#e5e7eb;
+      --accent:#111827;--accent2:#2563eb;--danger:#b91c1c;--ok:#047857;--shadow:0 8px 30px rgba(0,0,0,.08)
+    }
+    *{box-sizing:border-box} html{background:var(--bg)} body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--text);background:var(--bg)}
+    button,input,select{font:inherit} button{cursor:pointer}
+    .app{max-width:1100px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 16px calc(30px + env(safe-area-inset-bottom))}
+    .hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:16px}.hero h1{font-size:clamp(26px,4vw,42px);margin:0}.hero p{margin:5px 0 0;color:var(--muted)}
+    .totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}.stat{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:16px;box-shadow:var(--shadow)}.stat small{color:var(--muted);display:block}.stat strong{font-size:clamp(24px,4vw,34px);display:block;margin-top:4px}
+    .grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(320px,.75fr);gap:16px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:16px;box-shadow:var(--shadow)}
+    .section-title{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}.section-title h2{font-size:20px;margin:0}.nav{display:flex;gap:8px}.icon-btn{border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 11px}
+    .calendar-head,.calendar{display:grid;grid-template-columns:repeat(7,1fr)}.calendar-head div{text-align:center;color:var(--muted);font-size:12px;font-weight:700;padding:5px}.day{min-height:92px;border:1px solid var(--line);border-right:0;border-bottom:0;padding:8px;position:relative;background:#fff}.day:nth-child(7n){border-right:1px solid var(--line)}.day:nth-last-child(-n+7){border-bottom:1px solid var(--line)}.day.blank{background:#fafafa;color:#d1d5db}.day.today{outline:2px solid var(--accent2);outline-offset:-2px}.day.selected{background:#eff6ff}.day button{all:unset;cursor:pointer;position:absolute;inset:0}.date-num{font-weight:700}.hours-badge{display:inline-block;margin-top:24px;background:#eef2ff;color:#3730a3;border-radius:999px;padding:4px 7px;font-size:12px;font-weight:700}.week-total{grid-column:1/-1;background:#f9fafb;border:1px solid var(--line);border-top:0;padding:7px 10px;font-size:12px;color:var(--muted);text-align:right;font-weight:700}
+    .form{display:grid;gap:12px}.field{display:grid;gap:6px}.field label{font-size:13px;font-weight:700;color:#374151}.field input,.field select{width:100%;padding:12px 13px;border:1px solid #d1d5db;border-radius:12px;background:#fff;color:var(--text)}.field input:focus,.field select:focus{outline:3px solid rgba(37,99,235,.14);border-color:#60a5fa}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.primary{border:0;background:var(--accent);color:#fff;border-radius:13px;padding:13px 16px;font-weight:800}.secondary{border:1px solid var(--line);background:#fff;border-radius:13px;padding:12px 14px}.danger{border:1px solid #fecaca;background:#fff;color:var(--danger);border-radius:10px;padding:8px 10px}.success-note{font-size:13px;color:var(--ok);min-height:18px}
+    .shift-list{display:grid;gap:8px;margin-top:14px}.shift{border:1px solid var(--line);border-radius:14px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.shift .meta{color:var(--muted);font-size:13px;margin-top:3px}.shift .hrs{font-weight:800}.shift-actions{display:flex;gap:7px}.empty{color:var(--muted);font-size:14px;padding:6px 0}
+    .tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.tools button,.tools label{border:1px solid var(--line);background:#fff;border-radius:11px;padding:9px 11px;font-size:13px;cursor:pointer}.tools input[type=file]{display:none}.foot{color:var(--muted);font-size:12px;text-align:center;margin-top:16px;line-height:1.5}
+    @media(max-width:780px){.grid{grid-template-columns:1fr}.totals{grid-template-columns:1fr 1fr}.totals .stat:last-child{grid-column:1/-1}.day{min-height:74px;padding:6px}.hours-badge{margin-top:20px;font-size:11px;padding:3px 5px}.hero{align-items:flex-start;flex-direction:column}}
+    @media(max-width:480px){.app{padding-left:10px;padding-right:10px}.card{border-radius:16px;padding:12px}.totals{gap:8px}.stat{padding:12px;border-radius:15px}.two{grid-template-columns:1fr}.day{min-height:62px}.calendar-head div{font-size:10px}.hours-badge{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.week-total{font-size:11px}}
+    @media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#111827;--text:#f9fafb;--muted:#9ca3af;--line:#273244;--accent:#f9fafb;--accent2:#60a5fa;--shadow:none}.primary{background:#f9fafb;color:#111827}.secondary,.icon-btn,.field input,.field select,.tools button,.tools label{background:#111827;color:#f9fafb}.day{background:#111827}.day.blank{background:#0f172a}.day.selected{background:#172554}.week-total{background:#0f172a}.hours-badge{background:#312e81;color:#e0e7ff}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="hero">
+      <div><h1>Work Hours Tracker</h1><p>One place to record shifts, breaks, weekly hours and monthly totals.</p></div>
+    </div>
+
+    <section class="totals" aria-label="Hours summary">
+      <div class="stat"><small>Selected week</small><strong id="weekTotal">0.00 h</strong></div>
+      <div class="stat"><small>Current month</small><strong id="monthTotal">0.00 h</strong></div>
+      <div class="stat"><small>All time</small><strong id="allTotal">0.00 h</strong></div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <div class="section-title"><h2 id="monthLabel">Calendar</h2><div class="nav"><button class="icon-btn" id="prevMonth" aria-label="Previous month">‹</button><button class="icon-btn" id="todayBtn">Today</button><button class="icon-btn" id="nextMonth" aria-label="Next month">›</button></div></div>
+        <div class="calendar-head" aria-hidden="true"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+        <div id="calendar" class="calendar" aria-label="Work hours calendar"></div>
+      </div>
+
+      <div class="card">
+        <div class="section-title"><h2 id="formTitle">Add shift</h2></div>
+        <form id="shiftForm" class="form">
+          <input type="hidden" id="editingId" />
+          <div class="field"><label for="date">Date</label><input id="date" type="date" required /></div>
+          <div class="two">
+            <div class="field"><label for="start">Start time</label><input id="start" type="time" required /></div>
+            <div class="field"><label for="end">End time</label><input id="end" type="time" required /></div>
+          </div>
+          <div class="field"><label for="breakMin">Unpaid break</label><select id="breakMin"><option value="0">No break</option><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="45">45 minutes</option><option value="60">60 minutes</option><option value="90">90 minutes</option></select></div>
+          <button class="primary" type="submit" id="saveBtn">Save shift</button>
+          <button class="secondary" type="button" id="cancelEdit" hidden>Cancel edit</button>
+          <div id="note" class="success-note" aria-live="polite"></div>
+        </form>
+
+        <div class="section-title" style="margin-top:18px"><h2>Saved shifts</h2></div>
+        <div id="shiftList" class="shift-list"></div>
+        <div class="tools">
+          <button type="button" id="exportBtn">Export backup</button>
+          <label for="importFile">Import backup</label><input id="importFile" type="file" accept="application/json,.json" />
+        </div>
+      </div>
+    </section>
+    <p class="foot">Your entries are stored in this browser on this device. The app URL works across devices, but data does not automatically sync between devices unless a cloud database is added later.</p>
+  </main>
+<script>
+(() => {
+  const STORAGE_KEY='workHoursShifts_v2';
+  const $=id=>document.getElementById(id);
+  const els={calendar:$('calendar'),monthLabel:$('monthLabel'),weekTotal:$('weekTotal'),monthTotal:$('monthTotal'),allTotal:$('allTotal'),date:$('date'),start:$('start'),end:$('end'),breakMin:$('breakMin'),shiftList:$('shiftList'),form:$('shiftForm'),editingId:$('editingId'),formTitle:$('formTitle'),saveBtn:$('saveBtn'),cancelEdit:$('cancelEdit'),note:$('note')};
+  let shifts=load();
+  const now=new Date();
+  let viewDate=new Date(now.getFullYear(),now.getMonth(),1);
+  let selectedDate=toISO(now);
+  els.date.value=selectedDate;
+
+  function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch{return []}}
+  function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(shifts))}
+  function pad(n){return String(n).padStart(2,'0')}
+  function toISO(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+  function parseISO(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+  function fmtDate(s){return parseISO(s).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
+  function calcHours(start,end,breakMin){if(!start||!end)return 0;const [sh,sm]=start.split(':').map(Number),[eh,em]=end.split(':').map(Number);let mins=(eh*60+em)-(sh*60+sm);if(mins<0)mins+=24*60;mins-=Number(breakMin||0);return Math.max(0,mins/60)}
+  function shiftHours(s){return calcHours(s.start,s.end,s.breakMin)}
+  function startOfWeek(date){const d=new Date(date.getFullYear(),date.getMonth(),date.getDate());d.setDate(d.getDate()-d.getDay());return d}
+  function sameWeek(dateStr,anchorStr){const a=startOfWeek(parseISO(dateStr)),b=startOfWeek(parseISO(anchorStr));return a.getTime()===b.getTime()}
+  function total(filter){return shifts.filter(filter).reduce((sum,s)=>sum+shiftHours(s),0)}
+  function hoursForDate(date){return total(s=>s.date===date)}
+  function setNote(msg){els.note.textContent=msg;clearTimeout(setNote.t);setNote.t=setTimeout(()=>els.note.textContent='',2200)}
+
+  function render(){renderCalendar();renderSummary();renderList()}
+  function renderSummary(){
+    const y=viewDate.getFullYear(),m=viewDate.getMonth();
+    els.weekTotal.textContent=`${total(s=>sameWeek(s.date,selectedDate)).toFixed(2)} h`;
+    els.monthTotal.textContent=`${total(s=>{const d=parseISO(s.date);return d.getFullYear()===y&&d.getMonth()===m}).toFixed(2)} h`;
+    els.allTotal.textContent=`${total(()=>true).toFixed(2)} h`;
+  }
+  function renderCalendar(){
+    const y=viewDate.getFullYear(),m=viewDate.getMonth();
+    els.monthLabel.textContent=viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    els.calendar.innerHTML='';
+    const first=new Date(y,m,1),last=new Date(y,m+1,0),startBlank=first.getDay();
+    const cells=[];
+    for(let i=0;i<startBlank;i++)cells.push(null);
+    for(let d=1;d<=last.getDate();d++)cells.push(new Date(y,m,d));
+    while(cells.length%7)cells.push(null);
+    cells.forEach((d,i)=>{
+      const cell=document.createElement('div');cell.className='day'+(!d?' blank':'');
+      if(d){
+        const iso=toISO(d);if(iso===toISO(now))cell.classList.add('today');if(iso===selectedDate)cell.classList.add('selected');
+        const hrs=hoursForDate(iso);cell.innerHTML=`<span class="date-num">${d.getDate()}</span>${hrs?`<span class="hours-badge">${hrs.toFixed(2)} h</span>`:''}<button aria-label="Select ${fmtDate(iso)}"></button>`;
+        cell.querySelector('button').addEventListener('click',()=>{selectedDate=iso;els.date.value=iso;render();});
+      }
+      els.calendar.appendChild(cell);
+      if(i%7===6){
+        const rowDates=cells.slice(i-6,i+1).filter(Boolean).map(toISO);const wt=total(s=>rowDates.includes(s.date));
+        const w=document.createElement('div');w.className='week-total';w.textContent=`Week total: ${wt.toFixed(2)} h`;els.calendar.appendChild(w);
+      }
+    });
+  }
+  function renderList(){
+    const sorted=[...shifts].sort((a,b)=>b.date.localeCompare(a.date)||b.start.localeCompare(a.start));
+    if(!sorted.length){els.shiftList.innerHTML='<div class="empty">No shifts saved yet.</div>';return}
+    els.shiftList.innerHTML='';
+    sorted.forEach(s=>{
+      const row=document.createElement('div');row.className='shift';
+      row.innerHTML=`<div><div><strong>${fmtDate(s.date)}</strong></div><div class="meta">${s.start}–${s.end} • ${s.breakMin} min break</div></div><div><div class="hrs">${shiftHours(s).toFixed(2)} h</div><div class="shift-actions"><button class="secondary edit">Edit</button><button class="danger del">Delete</button></div></div>`;
+      row.querySelector('.edit').onclick=()=>editShift(s.id);row.querySelector('.del').onclick=()=>deleteShift(s.id);
+      els.shiftList.appendChild(row);
+    });
+  }
+  function editShift(id){const s=shifts.find(x=>x.id===id);if(!s)return;els.editingId.value=id;els.date.value=s.date;els.start.value=s.start;els.end.value=s.end;els.breakMin.value=String(s.breakMin);selectedDate=s.date;els.formTitle.textContent='Edit shift';els.saveBtn.textContent='Update shift';els.cancelEdit.hidden=false;window.scrollTo({top:0,behavior:'smooth'});render()}
+  function resetForm(){els.editingId.value='';els.formTitle.textContent='Add shift';els.saveBtn.textContent='Save shift';els.cancelEdit.hidden=true;els.date.value=selectedDate;els.start.value='';els.end.value='';els.breakMin.value='30'}
+  function deleteShift(id){if(!confirm('Delete this shift?'))return;shifts=shifts.filter(x=>x.id!==id);save();render();setNote('Shift deleted.')}
+
+  els.form.addEventListener('submit',e=>{
+    e.preventDefault();const date=els.date.value,start=els.start.value,end=els.end.value,breakMin=Number(els.breakMin.value);if(!date||!start||!end)return;
+    const hours=calcHours(start,end,breakMin);if(hours<=0){alert('Please check the start time, end time and break.');return}
+    const id=els.editingId.value;
+    if(id){const idx=shifts.findIndex(x=>x.id===id);if(idx>=0)shifts[idx]={...shifts[idx],date,start,end,breakMin};setNote('Shift updated.')}else{shifts.push({id:crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2),date,start,end,breakMin});setNote('Shift saved.')}
+    selectedDate=date;viewDate=new Date(parseISO(date).getFullYear(),parseISO(date).getMonth(),1);save();resetForm();render();
+  });
+  els.cancelEdit.onclick=resetForm;
+  $('prevMonth').onclick=()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()-1,1);render()};
+  $('nextMonth').onclick=()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()+1,1);render()};
+  $('todayBtn').onclick=()=>{selectedDate=toISO(now);viewDate=new Date(now.getFullYear(),now.getMonth(),1);els.date.value=selectedDate;render()};
+  els.date.addEventListener('change',()=>{if(!els.date.value)return;selectedDate=els.date.value;const d=parseISO(selectedDate);viewDate=new Date(d.getFullYear(),d.getMonth(),1);render()});
+  $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),shifts},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`work-hours-backup-${toISO(new Date())}.json`;a.click();URL.revokeObjectURL(a.href)};
+  $('importFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const data=JSON.parse(await f.text());const incoming=Array.isArray(data)?data:data.shifts;if(!Array.isArray(incoming))throw new Error();if(!confirm(`Import ${incoming.length} shifts and replace current data?`))return;shifts=incoming;save();render();setNote('Backup imported.')}catch{alert('That backup file could not be read.')}e.target.value=''});
+  if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./service-worker.js').catch(()=>{}))}
+  render();
+})();
+</script>
+</body>
+</html>
