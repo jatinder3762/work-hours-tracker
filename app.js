@@ -1,4 +1,4 @@
-const SUPABASE_URL='https://alzuqbvbwbujdiyviqfc.supabase.co';
+const SUPABASE_URL='https://alzuqbvbujdiyviqfc.supabase.co';
 const SUPABASE_KEY='sb_publishable_uvECVSwFX26UCWL9kgNTVA_6415LZ8J';
 const CACHE_KEY='workHoursCloudCache_v1';
 const LEGACY_KEY='workHoursShifts_v2';
@@ -21,7 +21,7 @@ $('signupBtn').onclick=async()=>{const email=$('email').value.trim(),password=$(
 $('resetBtn').onclick=async()=>{const email=$('email').value.trim();if(!email){authNote('Enter your email first.',true);return}const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.href.split('#')[0]});authNote(error?error.message:'Password reset email sent.',!!error)};
 $('logoutBtn').onclick=()=>sb.auth.signOut();
 $('shiftForm').addEventListener('submit',async e=>{e.preventDefault();if(!user)return;const payload={user_id:user.id,shift_date:$('date').value,start_time:$('start').value,end_time:$('end').value,break_minutes:Number($('breakMin').value)};note('Saving…');let q=editingId?sb.from('shifts').update(payload).eq('id',editingId):sb.from('shifts').insert(payload);const {error}=await q;if(error){note(error.message,true);return}cancelEdit();await refresh()});
-function cancelEdit(){editingId='';$('formTitle').textContent='Add shift';$('saveBtn').textContent='Save shift';$('cancelEdit').hidden=true;$('shiftForm').reset();$('date').value=selectedDate;$('breakMin').value='30'} $('cancelEdit').onclick=cancelEdit;
+function cancelEdit(){editingId='';$('formTitle').textContent='Add shift';$('saveBtn').textContent='Save shift';$('cancelEdit').hidden=true;$('shiftForm').reset();$('date').value=selectedDate;$('breakMin').value='0'} $('cancelEdit').onclick=cancelEdit;
 async function del(id){if(!confirm('Delete this shift?'))return;const {error}=await sb.from('shifts').delete().eq('id',id);if(error)note(error.message,true);else refresh()}
 function edit(id){const s=shifts.find(x=>x.id===id);if(!s)return;editingId=id;$('date').value=s.date;$('start').value=s.start;$('end').value=s.end;$('breakMin').value=s.breakMin;$('formTitle').textContent='Edit shift';$('saveBtn').textContent='Update shift';$('cancelEdit').hidden=false;scrollTo({top:0,behavior:'smooth'})}
 function total(f){return shifts.filter(f).reduce((n,s)=>n+hours(s),0)} function weekStart(d){d=new Date(d);d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d} function sameWeek(a,b){return weekStart(parse(a)).getTime()===weekStart(parse(b)).getTime()}
@@ -31,4 +31,4 @@ function renderList(){const box=$('shiftList');box.innerHTML='';if(!shifts.lengt
 $('prevMonth').onclick=()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()-1,1);render()};$('nextMonth').onclick=()=>{viewDate=new Date(viewDate.getFullYear(),viewDate.getMonth()+1,1);render()};$('todayBtn').onclick=()=>{viewDate=new Date(now.getFullYear(),now.getMonth(),1);selectedDate=iso(now);$('date').value=selectedDate;render()};
 $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({version:3,exportedAt:new Date().toISOString(),shifts},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`work-hours-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)};
 $('importFile').onchange=async e=>{if(!user||!e.target.files[0])return;try{const obj=JSON.parse(await e.target.files[0].text()),arr=Array.isArray(obj)?obj:obj.shifts;if(!Array.isArray(arr))throw 0;const rows=arr.map(s=>({user_id:user.id,shift_date:s.date,start_time:s.start,end_time:s.end,break_minutes:Number(s.breakMin||0)}));const {error}=await sb.from('shifts').insert(rows);if(error)throw error;note(`Imported ${rows.length} shift(s).`);refresh()}catch(err){note(err?.message||'Could not import backup.',true)}e.target.value=''};
-$('date').value=selectedDate;sb.auth.getSession().then(({data})=>setAuth(data.session));sb.auth.onAuthStateChange((_e,session)=>setAuth(session));render();
+$('date').value=selectedDate;$('breakMin').value='0';sb.auth.getSession().then(({data})=>setAuth(data.session));sb.auth.onAuthStateChange((_e,session)=>setAuth(session));render();
