@@ -5,3 +5,4 @@
 #mobileNav{display:none!important}@media(max-width:560px){#mobileNav{display:flex!important;position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:12;padding:6px!important;gap:4px!important;border:1px solid #dfe6f2;border-radius:18px!important;background:rgba(255,255,255,.94)!important;box-shadow:0 14px 34px rgba(42,65,112,.18);backdrop-filter:blur(18px)}#mobileNav .btn{flex:1;color:#60708b!important;background:transparent!important;padding:11px 6px;border-radius:13px}#mobileNav .btn:first-child{color:var(--blue)!important;background:#eaf1ff!important}}
 [hidden]{display:none!important}
 .shift-card{order:initial}
+.auth-error{background:#fff0f2!important;color:#a93041!important;border:1px solid #f4cbd2}.auth-form .btn:disabled{cursor:wait;opacity:.72;transform:none;box-shadow:none}input[aria-invalid="true"]{border-color:#dc4757;box-shadow:0 0 0 4px rgba(220,71,87,.1)}
