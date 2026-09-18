@@ -6,3 +6,4 @@
 [hidden]{display:none!important}
 .shift-card{order:initial}
 .auth-error{background:#fff0f2!important;color:#a93041!important;border:1px solid #f4cbd2}.auth-form .btn:disabled{cursor:wait;opacity:.72;transform:none;box-shadow:none}input[aria-invalid="true"]{border-color:#dc4757;box-shadow:0 0 0 4px rgba(220,71,87,.1)}
+input,select,textarea{font-size:16px}
