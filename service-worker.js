@@ -1,4 +1,4 @@
-const CACHE='my-tracker-v1';
+const CACHE='my-tracker-v2';
 const ASSETS=['./','./index.html','./style.css','./app.js','./app-core.js','./manifest.json','./icon.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim()});
