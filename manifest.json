@@ -1,18 +1,11 @@
 {
-  "name": "Work Hours Tracker",
-  "short_name": "Work Hours",
-  "description": "Simple work-hours tracker with weekly and monthly totals.",
+  "name": "My Tracker",
+  "short_name": "My Tracker",
+  "description": "Track your time, know your earnings.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#f3f4f6",
-  "theme_color": "#111827",
-  "icons": [
-    {
-      "src": "./icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "background_color": "#F5F8FF",
+  "theme_color": "#F5F8FF",
+  "icons": [{"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
 }
