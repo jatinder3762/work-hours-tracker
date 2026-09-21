@@ -1,8 +1,35 @@
 window.initPayPeriodUI=()=>{
   const formatDate=value=>dt(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  const formatRange=(start,end)=>`${formatDate(start)}${start.slice(0,4)===end.slice(0,4)?'':' '+start.slice(0,4)} – ${dt(end).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}`;
   const periodLabel=work=>`${freq(work.pay_frequency)} pay period`;
   const periodShifts=(work,range)=>ws(work.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
   const shiftHours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
+  const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
+    // Only paid records retain their historical boundaries. Unpaid rows are regenerated
+    // from the workplace's current schedule so a changed week start cannot count hours twice.
+    const paid=savedPeriods.filter(item=>item.paid);
+    const ranges=new Map(paid.map(item=>[`${item.period_start}|${item.period_end}`,item]));
+    const addRange=range=>{
+      const key=`${range.start}|${range.end}`;
+      if(ranges.has(key))return;
+      if(paid.some(item=>item.period_start<=range.end&&item.period_end>=range.start))return;
+      ranges.set(key,{period_start:range.start,period_end:range.end,paid:false});
+    };
+    addRange(currentRange);
+    shiftDates.forEach(date=>addRange(period(work,dt(date))));
+    const dates=shiftDates.concat(paid.map(item=>item.period_start));
+    if(dates.length){
+      const oldest=period(work,dt(dates.sort()[0])).start;
+      const step=work.pay_frequency==='monthly'?null:work.pay_frequency==='weekly'?7:14;
+      let cursor=currentRange.start;
+      for(let index=0;index<520&&cursor>=oldest;index++){
+        addRange(period(work,dt(cursor)));
+        cursor=step?fromUtcDay(utcDay(cursor)-step):day(new Date(dt(cursor).getFullYear(),dt(cursor).getMonth()-1,1));
+        if(!step)cursor=period(work,dt(cursor)).start;
+      }
+    }
+    return [...ranges.values()].sort((a,b)=>b.period_start.localeCompare(a.period_start));
+  };
   const weekdays=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const utcDay=value=>Date.UTC(+value.slice(0,4),+value.slice(5,7)-1,+value.slice(8,10))/86400000;
   const fromUtcDay=value=>new Date(value*86400000).toISOString().slice(0,10);
@@ -213,31 +240,7 @@ window.initPayPeriodUI=()=>{
     catch(cause){error=cause}
     if(!current||current.id!==workplaceId)return;
     if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
-    const saved=new Map((data||[]).map(item=>[`${item.period_start}|${item.period_end}`,item]));
-    const ranges=new Map(saved);
-    const now=period(current);
-    if(!ranges.has(`${now.start}|${now.end}`))ranges.set(`${now.start}|${now.end}`,{period_start:now.start,period_end:now.end,paid:false});
-    ws(workplaceId).forEach(shift=>{
-      const range=period(current,dt(shift.date));
-      const key=`${range.start}|${range.end}`;
-      const overlapsPaid=(data||[]).some(item=>item.paid&&item.period_start<=range.end&&item.period_end>=range.start);
-      if(!ranges.has(key)&&!overlapsPaid)ranges.set(key,{period_start:range.start,period_end:range.end,paid:false});
-    });
-    const dates=ws(workplaceId).map(shift=>shift.date).concat((data||[]).map(item=>item.period_start));
-    if(dates.length){
-      const oldest=period(current,dt(dates.sort()[0])).start;
-      const step=current.pay_frequency==='monthly'?null:current.pay_frequency==='weekly'?7:14;
-      let cursor=now.start;
-      for(let index=0;index<520&&cursor>=oldest;index++){
-        const range=period(current,dt(cursor));
-        const overlapsPaid=(data||[]).some(item=>item.paid&&item.period_start<=range.end&&item.period_end>=range.start);
-        const key=`${range.start}|${range.end}`;
-        if(!ranges.has(key)&&!overlapsPaid)ranges.set(key,{period_start:range.start,period_end:range.end,paid:false});
-        cursor=step?fromUtcDay(utcDay(cursor)-step):day(new Date(dt(cursor).getFullYear(),dt(cursor).getMonth()-1,1));
-        if(!step)cursor=period(current,dt(cursor)).start;
-      }
-    }
-    const periods=[...ranges.values()].sort((a,b)=>b.period_start.localeCompare(a.period_start));
+    const periods=buildPeriodHistory(current,ws(workplaceId).map(shift=>shift.date),data||[],period(current));
     $('payPeriods').innerHTML='';
     $('periodRows').innerHTML='';
     $('historyMore').hidden=periods.length<=visiblePeriods;
@@ -246,7 +249,7 @@ window.initPayPeriodUI=()=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
       const row=document.createElement('div');
       row.className='shift pay-period-row';
-      row.innerHTML=`<div><strong>${formatDate(item.period_start)} – ${formatDate(item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div><button class="btn ${item.paid?'success':'warning'}">${item.paid?'Paid · Unlock':'Mark Paid'}</button>`;
+      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div><button class="btn ${item.paid?'success':'warning'}">${item.paid?'Paid · Unlock':'Mark Paid'}</button>`;
       const onAction=async button=>{
         button.disabled=true;
         button.classList.add('is-loading');
@@ -272,7 +275,7 @@ window.initPayPeriodUI=()=>{
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
         const tableRow=document.createElement('tr');
-        tableRow.innerHTML=`<td>${index+1}</td><td>${formatDate(item.period_start)} – ${formatDate(item.period_end)}</td><td>${shiftHours(list).toFixed(2)} h</td><td>${has(list)?cash(total(list)):'—'}</td><td><span class="badge ${item.paid?'success':'warning'}">${item.paid?'Paid':'Unpaid'}</span></td><td><button type="button" class="btn ${item.paid?'secondary':'primary'}">${item.paid?'Unlock':'Mark Paid'}</button></td>`;
+        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status"><span class="badge ${item.paid?'success':'warning'}">${item.paid?'Paid':'Unpaid'}</span></td><td data-label="Action"><button type="button" class="btn ${item.paid?'secondary':'primary'}">${item.paid?'Unlock':'Mark Paid'}</button></td>`;
         tableRow.querySelector('button').onclick=function(){onAction(this)};
         $('periodRows').appendChild(tableRow);
       }
