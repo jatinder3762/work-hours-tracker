@@ -22,6 +22,7 @@ window.initPayPeriodUI=()=>{
   $('anchorLabel').insertAdjacentElement('beforebegin',weekSelect);
   $('workForm').querySelector('.modal-actions').insertAdjacentHTML('beforebegin','<p id="periodSettingsNote" class="auth-error" role="alert"></p>');
   const anchorInput=$('payAnchor');
+  anchorInput.insertAdjacentHTML('afterend','<small class="muted">This is the earliest date you can enter a shift for this workplace. Choose an earlier date if you need to add previous unpaid weeks.</small>');
   const syncWeekFields=()=>{
     const weekly=$('payFrequency').value!=='monthly';
     weekSelect.hidden=!weekly;
@@ -45,14 +46,20 @@ window.initPayPeriodUI=()=>{
   const baseWorkSubmit=$('workForm').onsubmit;
   $('workForm').onsubmit=async event=>{
     event.preventDefault();
+    const saveButton=$('workForm').querySelector('.modal-actions button:last-child');
+    if(saveButton.disabled)return;
     const id=$('workId').value;
     const previous=works.find(work=>work.id===id);
     const next={...previous,pay_frequency:$('payFrequency').value,pay_anchor_date:anchorInput.value||null};
     const note=$('periodSettingsNote');
     note.textContent='';
-    if(next.pay_frequency!=='monthly'&&(!next.pay_anchor_date||dt(next.pay_anchor_date).getDay()!==+$('weekStart').value)){
+    if(!next.pay_anchor_date){note.textContent='Choose the workplace start date before saving.';return}
+    if(next.pay_frequency!=='monthly'&&dt(next.pay_anchor_date).getDay()!==+$('weekStart').value){
       note.textContent='Choose a start day and a matching first pay-period date.';return;
     }
+    saveButton.disabled=true;saveButton.classList.add('is-loading');
+    saveButton.setAttribute('aria-busy','true');
+    try{
     if(previous&&(previous.pay_frequency!==next.pay_frequency||previous.pay_anchor_date!==next.pay_anchor_date)){
       const {data,error}=await sb.from('pay_periods').select('period_start,period_end').eq('workplace_id',id).eq('paid',true);
       if(error){note.textContent=error.message||'Unable to check paid history.';return}
@@ -60,7 +67,9 @@ window.initPayPeriodUI=()=>{
         note.textContent='This change would move an already paid period. Unlock affected periods before changing the pay schedule.';return;
       }
     }
-    return baseWorkSubmit(event);
+    return await baseWorkSubmit(event);
+    }catch(error){note.textContent=error.message||'Unable to save workplace.'}
+    finally{saveButton.disabled=false;saveButton.classList.remove('is-loading');saveButton.removeAttribute('aria-busy')}
   };
 
   const ensureSummary=()=>{
@@ -122,6 +131,9 @@ window.initPayPeriodUI=()=>{
     $('allTimeHoursTotal').textContent=shiftHours(all).toFixed(2)+' h';
     $('allTimeEarningsTotal').textContent=has(all)?cash(total(all)):'—';
 
+    const currentAction=$('currentPeriodAction');
+    currentAction.disabled=true;
+    currentAction.classList.add('is-loading');
     try{
       const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).eq('paid',true);
       if(error)throw error;
@@ -139,6 +151,7 @@ window.initPayPeriodUI=()=>{
       action.className='btn '+(isPaid?'secondary':'primary');
       action.dataset.paid=String(isPaid);
     }catch(error){msg(error.message||'Unable to load pay status.',true)}
+    finally{if(current?.id===workplaceId){currentAction.disabled=false;currentAction.classList.remove('is-loading')}}
   };
 
   async function markCurrentPaid(){
@@ -148,18 +161,25 @@ window.initPayPeriodUI=()=>{
     const list=periodShifts(current,range);
     if(!list.length){msg('Add at least one shift before marking this period paid.',true);return;}
     if(!confirm(`Mark ${formatDate(range.start)} – ${formatDate(range.end)} as paid and lock its shifts?`))return;
-    this.disabled=true;this.textContent='Saving…';
+    this.disabled=true;this.classList.add('is-loading');this.textContent='Saving…';
     try{
       const {error}=await sb.from('pay_periods').upsert({user_id:user.id,workplace_id:current.id,period_start:range.start,period_end:range.end,paid:true,paid_at:new Date().toISOString()},{onConflict:'workplace_id,period_start,period_end'});
       if(error)throw error;
       await updateWorkSummary();
       if(!$('historyContent').hidden)await renderPay();
       msg('Pay period marked paid. Its shifts are now locked.');
-    }catch(error){msg(error.message||'Unable to mark this period paid.',true)}finally{this.disabled=false}
+    }catch(error){msg(error.message||'Unable to mark this period paid.',true)}finally{this.disabled=false;this.classList.remove('is-loading')}
   }
 
   const baseRenderDash=renderDash;
-  renderDash=function(){baseRenderDash();enhanceDashboard()};
+  renderDash=function(){
+    baseRenderDash();
+    document.querySelectorAll('#workplaces .work-card').forEach(card=>{
+      card.setAttribute('role','button');card.tabIndex=0;
+      card.onkeydown=event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();card.click()}};
+    });
+    enhanceDashboard();
+  };
   const baseRenderWork=renderWork;
   renderWork=function(){baseRenderWork();updateWorkSummary();if(!$('historyContent').hidden)renderPay()};
 
@@ -169,18 +189,28 @@ window.initPayPeriodUI=()=>{
   history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Mark a period paid after its shifts have been paid.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status</th><th>Action</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   ensureSummary().insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
-  $('historyToggle').onclick=()=>{
+  $('historyToggle').onclick=async function(){
     $('historyContent').hidden=!$('historyContent').hidden;
     $('historyToggle').setAttribute('aria-expanded',String(!$('historyContent').hidden));
     $('historyToggle').textContent=$('historyContent').hidden?'Show periods':'Hide periods';
-    if(!$('historyContent').hidden)renderPay();
+    if(!$('historyContent').hidden){this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}}
   };
-  $('historyMore').onclick=()=>{visiblePeriods+=12;renderPay()};
+  $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
+  const basePayClick=$('payBtn').onclick;
+  $('payBtn').onclick=async function(){
+    if(this.disabled)return;
+    this.disabled=true;this.classList.add('is-loading');
+    try{await basePayClick()}finally{this.disabled=false;this.classList.remove('is-loading')}
+  };
 
   renderPay=async function(){
     if(!current)return;
     const workplaceId=current.id;
-    const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).order('period_start',{ascending:false});
+    if(!$('payModal').hidden)$('payPeriods').innerHTML='<div class="list-loading"><span class="spinner"></span> Loading pay periods…</div>';
+    if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="6"><span class="spinner"></span> Loading pay periods…</td></tr>';
+    let data,error;
+    try{({data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
+    catch(cause){error=cause}
     if(!current||current.id!==workplaceId)return;
     if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
     const saved=new Map((data||[]).map(item=>[`${item.period_start}|${item.period_end}`,item]));
@@ -219,6 +249,7 @@ window.initPayPeriodUI=()=>{
       row.innerHTML=`<div><strong>${formatDate(item.period_start)} – ${formatDate(item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div><button class="btn ${item.paid?'success':'warning'}">${item.paid?'Paid · Unlock':'Mark Paid'}</button>`;
       const onAction=async button=>{
         button.disabled=true;
+        button.classList.add('is-loading');
         try{
         if(item.paid){
           const accountPassword=prompt('Enter your account password to unlock this pay period:');
@@ -234,7 +265,8 @@ window.initPayPeriodUI=()=>{
           if(saveError){alert(saveError.message);return}
         }
         await renderPay();await updateWorkSummary();enhanceDashboard();
-        }finally{button.disabled=false}
+        }catch(error){alert(error.message||'Unable to update pay status.')}
+        finally{button.disabled=false;button.classList.remove('is-loading')}
       };
       row.querySelector('button').onclick=function(){onAction(this)};
       if(index<24)$('payPeriods').appendChild(row);
