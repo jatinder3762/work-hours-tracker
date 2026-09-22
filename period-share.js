@@ -69,8 +69,9 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
 
     write('SELECTED PERIOD',64,244,'bold 15px Arial, sans-serif','#50658d');
     write(formatRange(range.period_start,range.period_end),64,287,'bold 29px Arial, sans-serif','#17233d',615);
-    rounded(64,307,range.paid?74:91,30,15,range.paid?'#e5f8ee':'#fff1d3');
-    write(range.paid?'PAID':'UNPAID',78,328,'bold 13px Arial, sans-serif',range.paid?'#087355':'#8a5b0b');
+    const partial=!range.paid&&+range.amount_received>0;
+    rounded(64,307,range.paid?74:91,30,15,range.paid?'#e5f8ee':partial?'#e6f0ff':'#fff1d3');
+    write(range.paid?'PAID':partial?'PARTIAL':'UNPAID',78,328,'bold 13px Arial, sans-serif',range.paid?'#087355':partial?'#2d59a6':'#8a5b0b');
 
     rounded(64,361,298,107,17,'#edf3ff');
     rounded(378,361,318,107,17,'#e8f7f1');
@@ -95,6 +96,11 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     });
     const footerY=553+rowCount*72;
     write('Personal work log. Hours exclude unpaid breaks.',64,footerY+12,'14px Arial, sans-serif','#68758d');
+    if(partial&&shifts.every(shift=>shift.rate>0)){
+      const estimate=shifts.reduce((sum,shift)=>sum+h(shift)*shift.rate,0);
+      const covered=estimate>0?Math.min(hours,hours*+range.amount_received/estimate):0;
+      write(`Estimated paid ${covered.toFixed(2)} h  ·  Pending ${Math.max(0,hours-covered).toFixed(2)} h`,64,footerY+35,'13px Arial, sans-serif','#315ddc');
+    }
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Could not create the report image.')),'image/png'));
     const filename=`my-tracker-${range.period_start}-to-${range.period_end}.png`;
     return new File([blob],filename,{type:'image/png'});

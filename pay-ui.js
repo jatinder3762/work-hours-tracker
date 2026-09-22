@@ -2,24 +2,35 @@ window.initPayPeriodUI=()=>{
   const formatDate=value=>dt(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   const formatRange=(start,end)=>`${formatDate(start)}${start.slice(0,4)===end.slice(0,4)?'':' '+start.slice(0,4)} – ${dt(end).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}`;
   const periodLabel=work=>`${freq(work.pay_frequency)} pay period`;
-  const statusButtons=item=>`<div class="pay-status-toggle" role="group" aria-label="Payment status for ${formatRange(item.period_start,item.period_end)}"><button type="button" class="btn pay-status-choice ${item.paid?'':'is-unpaid'}" data-paid="false" aria-pressed="${!item.paid}">Unpaid</button><button type="button" class="btn pay-status-choice ${item.paid?'is-paid':''}" data-paid="true" aria-pressed="${!!item.paid}">Paid</button></div>`;
+  const payStatus=item=>item.paid?'paid':+item.amount_received>0?'partial':'unpaid';
+  const statusName=item=>item.paid?'Paid':+item.amount_received>0?'Partially paid':'Unpaid';
+  const statusButtons=item=>{
+    const selected=payStatus(item);
+    return `<div class="pay-status-toggle" role="group" aria-label="Payment status for ${formatRange(item.period_start,item.period_end)}">${[['unpaid','Unpaid'],['partial','Partial'],['paid','Paid']].map(([value,label])=>`<button type="button" class="btn pay-status-choice ${selected===value?'is-'+value:''}" data-status="${value}" aria-pressed="${selected===value}">${label}</button>`).join('')}</div>`;
+  };
   const periodShifts=(work,range)=>ws(work.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
   const shiftHours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
+  const partialProgress=(list,amount)=>{
+    const hours=shiftHours(list),gross=total(list);
+    const valid=list.length>0&&list.every(shift=>shift.rate!=null&&shift.rate>0)&&gross>0;
+    const covered=valid?Math.min(hours,Math.max(0,hours*(+amount||0)/gross)):0;
+    return{valid,hours,gross,covered,pending:Math.max(0,hours-covered)};
+  };
   const sharePeriod=window.createPeriodSharing({h,dt,formatRange});
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
-    // Only paid records retain their historical boundaries. Unpaid rows are regenerated
-    // from the workplace's current schedule so a changed week start cannot count hours twice.
-    const paid=savedPeriods.filter(item=>item.paid);
-    const ranges=new Map(paid.map(item=>[`${item.period_start}|${item.period_end}`,item]));
+    // Preserve paid and partially paid ranges. Regenerate untouched unpaid rows
+    // from the current schedule so old week anchors cannot count shifts twice.
+    const recorded=savedPeriods.filter(item=>item.paid||+item.amount_received>0);
+    const ranges=new Map(recorded.map(item=>[`${item.period_start}|${item.period_end}`,item]));
     const addRange=range=>{
       const key=`${range.start}|${range.end}`;
       if(ranges.has(key))return;
-      if(paid.some(item=>item.period_start<=range.end&&item.period_end>=range.start))return;
+      if(recorded.some(item=>item.period_start<=range.end&&item.period_end>=range.start))return;
       ranges.set(key,{period_start:range.start,period_end:range.end,paid:false});
     };
     addRange(currentRange);
     shiftDates.forEach(date=>addRange(period(work,dt(date))));
-    const dates=shiftDates.concat(paid.map(item=>item.period_start));
+    const dates=shiftDates.concat(recorded.map(item=>item.period_start));
     if(dates.length){
       const oldest=period(work,dt(dates.sort()[0])).start;
       const step=work.pay_frequency==='monthly'?null:work.pay_frequency==='weekly'?7:14;
@@ -90,15 +101,91 @@ window.initPayPeriodUI=()=>{
     saveButton.setAttribute('aria-busy','true');
     try{
     if(previous&&(previous.pay_frequency!==next.pay_frequency||previous.pay_anchor_date!==next.pay_anchor_date)){
-      const {data,error}=await sb.from('pay_periods').select('period_start,period_end').eq('workplace_id',id).eq('paid',true);
+      const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',id);
       if(error){note.textContent=error.message||'Unable to check paid history.';return}
-      if((data||[]).some(saved=>{const range=period(next,dt(saved.period_start));return range.start!==saved.period_start||range.end!==saved.period_end})){
-        note.textContent='This change would move an already paid period. Unlock affected periods before changing the pay schedule.';return;
+      if((data||[]).some(saved=>{
+        if(!saved.paid&&!(+saved.amount_received>0))return false;
+        const range=period(next,dt(saved.period_start));
+        return range.start!==saved.period_start||range.end!==saved.period_end;
+      })){
+        note.textContent='This change would move a period with recorded payment. Clear or unlock that period before changing the pay schedule.';return;
       }
     }
     return await baseWorkSubmit(event);
     }catch(error){note.textContent=error.message||'Unable to save workplace.'}
     finally{saveButton.disabled=false;saveButton.classList.remove('is-loading');saveButton.removeAttribute('aria-busy')}
+  };
+
+  let currentPeriodRecord=null;
+  let choiceContext=null;
+  const choiceModal=document.createElement('div');
+  choiceModal.id='paymentChoiceModal';
+  choiceModal.className='modal';
+  choiceModal.hidden=true;
+  choiceModal.innerHTML='<div class="card modal-card payment-choice-card"><p class="eyebrow">RECORD PAYMENT</p><h2 id="choiceDates">Pay period</h2><p class="muted">Choose how much of this period has been paid.</p><div class="payment-choices"><button type="button" id="chooseFullPayment" class="btn primary">Fully paid</button><button type="button" id="choosePartialPayment" class="btn secondary">Partially paid</button></div><form id="partialPaymentForm" class="form" hidden><label>Total amount received so far (CAD)<input id="partialAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><p id="partialEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Hours are estimated from recorded gross rates. Paycheck deductions can change the amount received. Partial payment keeps the period open.</p><button id="savePartialPayment" class="btn primary wide">Record partial payment</button></form><p id="paymentChoiceError" class="auth-error" role="alert" hidden></p><div class="modal-actions"><button type="button" id="cancelPaymentChoice" class="btn secondary">Cancel</button></div></div>';
+  document.body.appendChild(choiceModal);
+  const closeChoice=()=>{choiceModal.hidden=true;choiceContext=null;$('partialPaymentForm').hidden=true;$('paymentChoiceError').hidden=true};
+  $('cancelPaymentChoice').onclick=closeChoice;
+  choiceModal.onclick=event=>{if(event.target===choiceModal)closeChoice()};
+  const choiceError=message=>{$('paymentChoiceError').textContent=message;$('paymentChoiceError').hidden=false};
+  const refreshPaymentViews=async()=>{await Promise.all([renderPay(),updateWorkSummary()]);enhanceDashboard()};
+  const openPaymentChoice=(item,list,work,showPartial=false)=>{
+    choiceContext={item,list,work};
+    $('choiceDates').textContent=formatRange(item.period_start,item.period_end);
+    $('partialAmount').value=+item.amount_received>0?(+item.amount_received).toFixed(2):'';
+    $('partialPaymentForm').hidden=true;$('paymentChoiceError').hidden=true;
+    choiceModal.hidden=false;
+    if(showPartial)$('choosePartialPayment').click();
+  };
+  const updatePartialEstimate=()=>{
+    if(!choiceContext)return;
+    const info=partialProgress(choiceContext.list,+$('partialAmount').value);
+    $('partialEstimate').textContent=info.valid?`Estimated paid ${info.covered.toFixed(2)} h · Pending ${info.pending.toFixed(2)} h of ${info.hours.toFixed(2)} h`:'Each shift needs a positive hourly rate before paid hours can be calculated.';
+  };
+  $('partialAmount').oninput=updatePartialEstimate;
+  $('choosePartialPayment').onclick=async function(){
+    if(!choiceContext)return;
+    if(!partialProgress(choiceContext.list,0).valid){choiceError('Add a positive rate to every shift before recording a partial payment.');return}
+    this.disabled=true;this.classList.add('is-loading');
+    try{
+      const {error}=await sb.from('pay_periods').select('amount_received').limit(1);
+      if(error){choiceError('Partial payments need the new Supabase database migration before they can be saved.');return}
+      $('paymentChoiceError').hidden=true;$('partialPaymentForm').hidden=false;updatePartialEstimate();
+      $('partialAmount').focus();
+    }catch(error){choiceError(error.message||'Unable to check partial payments.')}
+    finally{this.disabled=false;this.classList.remove('is-loading')}
+  };
+  $('chooseFullPayment').onclick=async function(){
+    if(!choiceContext)return;
+    const {item,list,work}=choiceContext;
+    if(!list.length){choiceError('Add at least one shift before marking this period fully paid.');return}
+    if(!confirm(`Have all ${shiftHours(list).toFixed(2)} hours been fully paid? This will lock the entire period.`))return;
+    this.disabled=true;this.classList.add('is-loading');
+    try{
+      const payload={user_id:user.id,workplace_id:work.id,period_start:item.period_start,period_end:item.period_end,paid:true,paid_at:new Date().toISOString()};
+      if(+item.amount_received>0)payload.amount_received=+item.amount_received;
+      const {error}=await sb.from('pay_periods').upsert(payload,{onConflict:'workplace_id,period_start,period_end'});
+      if(error)throw error;
+      closeChoice();await refreshPaymentViews();
+      msg('Period marked fully paid. Its shifts are now locked.');
+    }catch(error){choiceError(error.message||'Unable to mark this period fully paid.')}
+    finally{this.disabled=false;this.classList.remove('is-loading')}
+  };
+  $('partialPaymentForm').onsubmit=async event=>{
+    event.preventDefault();
+    if(!choiceContext)return;
+    const {item,list,work}=choiceContext,info=partialProgress(list,+$('partialAmount').value);
+    const amount=+$('partialAmount').value;
+    if(!Number.isFinite(amount)||amount<=0||!info.valid){choiceError('Enter a valid amount and make sure every shift has a positive rate.');return}
+    if(amount>=info.gross){choiceError('This covers the estimated full period. Choose Fully paid once all hours are confirmed paid.');return}
+    const button=$('savePartialPayment');button.disabled=true;button.classList.add('is-loading');
+    try{
+      const {error}=await sb.from('pay_periods').upsert({user_id:user.id,workplace_id:work.id,period_start:item.period_start,period_end:item.period_end,paid:false,paid_at:null,amount_received:Math.round(amount*100)/100},{onConflict:'workplace_id,period_start,period_end'});
+      if(error)throw error;
+      closeChoice();await refreshPaymentViews();
+      msg(`Partial payment recorded. Estimated ${info.covered.toFixed(2)} h covered; ${info.pending.toFixed(2)} h pending.`);
+    }catch(error){choiceError(error.message||'Unable to record partial payment.')}
+    finally{button.disabled=false;button.classList.remove('is-loading')}
   };
 
   const ensureSummary=()=>{
@@ -107,7 +194,7 @@ window.initPayPeriodUI=()=>{
     summary=document.createElement('section');
     summary.id='paySummary';
     summary.className='card pay-summary';
-    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Mark Paid</button></div><div class="pay-summary-grid"><div><small>Paid hours</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Paid earnings</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
+    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
     document.querySelector('#workplaceView .stats')?.insertAdjacentElement('afterend',summary);
     document.getElementById('currentPeriodAction').onclick=markCurrentPaid;
     return summary;
@@ -133,11 +220,11 @@ window.initPayPeriodUI=()=>{
       matches.push({work,range,card});
     });
     try{
-      const {data}=await sb.from('pay_periods').select('workplace_id,period_start,period_end,paid').eq('paid',true);
+      const {data}=await sb.from('pay_periods').select('*');
       matches.forEach(({work,range,card})=>{
-        const paid=(data||[]).some(item=>item.workplace_id===work.id&&item.period_start===range.start&&item.period_end===range.end);
+        const item=(data||[]).find(row=>row.workplace_id===work.id&&row.period_start===range.start&&row.period_end===range.end);
         const badge=card.querySelector('.period-card-status');
-        if(paid){badge.textContent='Paid';badge.className='badge period-card-status success'}
+        if(item){badge.textContent=statusName(item);badge.className='badge period-card-status '+(item.paid?'success':+item.amount_received>0?'partial':'warning')}
       });
     }catch(_error){}
   };
@@ -164,19 +251,25 @@ window.initPayPeriodUI=()=>{
     currentAction.disabled=true;
     currentAction.classList.add('is-loading');
     try{
-      const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).eq('paid',true);
+      const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId);
       if(error)throw error;
       if(!current||current.id!==workplaceId)return;
-      const paidPeriods=data||[];
+      const periods=data||[];
+      const paidPeriods=periods.filter(item=>item.paid);
+      const partialPeriods=periods.filter(item=>!item.paid&&+item.amount_received>0);
       const paidList=all.filter(shift=>paidPeriods.some(item=>shift.date>=item.period_start&&shift.date<=item.period_end));
-      $('paidHoursTotal').textContent=shiftHours(paidList).toFixed(2)+' h';
+      const partialHours=partialPeriods.reduce((sum,item)=>sum+partialProgress(all.filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end),item.amount_received).covered,0);
+      $('paidHoursTotal').textContent=(shiftHours(paidList)+partialHours).toFixed(2)+' h';
       $('paidEarningsTotal').textContent=has(paidList)?cash(total(paidList)):'—';
-      const isPaid=paidPeriods.some(item=>item.period_start===range.start&&item.period_end===range.end);
+      currentPeriodRecord=periods.find(item=>item.period_start===range.start&&item.period_end===range.end)||null;
+      const currentCovered=currentPeriodRecord?.paid?shiftHours(currentList):partialProgress(currentList,currentPeriodRecord?.amount_received).covered;
+      $('pendingHoursTotal').textContent=Math.max(0,shiftHours(currentList)-currentCovered).toFixed(2)+' h';
+      const isPaid=!!currentPeriodRecord?.paid;
       const badge=$('currentPeriodStatus');
       const action=$('currentPeriodAction');
-      badge.textContent=isPaid?'Paid':'Unpaid';
-      badge.className='badge '+(isPaid?'success':'warning');
-      action.textContent=isPaid?'View Paid Period':'Mark Paid';
+      badge.textContent=statusName(currentPeriodRecord||{});
+      badge.className='badge '+(isPaid?'success':+currentPeriodRecord?.amount_received>0?'partial':'warning');
+      action.textContent=isPaid?'View Paid Period':+currentPeriodRecord?.amount_received>0?'Manage payment':'Record payment';
       action.className='btn '+(isPaid?'secondary':'primary');
       action.dataset.paid=String(isPaid);
     }catch(error){msg(error.message||'Unable to load pay status.',true)}
@@ -189,15 +282,7 @@ window.initPayPeriodUI=()=>{
     const range=period(current);
     const list=periodShifts(current,range);
     if(!list.length){msg('Add at least one shift before marking this period paid.',true);return;}
-    if(!confirm(`Mark ${formatDate(range.start)} – ${formatDate(range.end)} as paid and lock its shifts?`))return;
-    this.disabled=true;this.classList.add('is-loading');this.textContent='Saving…';
-    try{
-      const {error}=await sb.from('pay_periods').upsert({user_id:user.id,workplace_id:current.id,period_start:range.start,period_end:range.end,paid:true,paid_at:new Date().toISOString()},{onConflict:'workplace_id,period_start,period_end'});
-      if(error)throw error;
-      await updateWorkSummary();
-      if(!$('historyContent').hidden)await renderPay();
-      msg('Pay period marked paid. Its shifts are now locked.');
-    }catch(error){msg(error.message||'Unable to mark this period paid.',true)}finally{this.disabled=false;this.classList.remove('is-loading')}
+    openPaymentChoice(currentPeriodRecord||{period_start:range.start,period_end:range.end,paid:false,amount_received:0},list,current);
   }
 
   const baseRenderDash=renderDash;
@@ -215,7 +300,7 @@ window.initPayPeriodUI=()=>{
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Select Paid after you receive payment. Switching back to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   ensureSummary().insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyToggle').onclick=async function(){
@@ -250,40 +335,46 @@ window.initPayPeriodUI=()=>{
     periods.slice(0,Math.max(visiblePeriods,24)).forEach((item,index)=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
       const work=current;
+      const progress=partialProgress(list,item.amount_received);
+      const detail=!item.paid&&+item.amount_received>0?`${cash(+item.amount_received)} received · ${progress.covered.toFixed(2)} h est. covered · ${progress.pending.toFixed(2)} h pending`:'';
       const row=document.createElement('div');
       row.className='shift pay-period-row';
-      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(work)}</small></div><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div>`;
-      const onAction=async(button,markPaid)=>{
-        if(markPaid===!!item.paid)return;
+      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(work)}</small>${detail?`<small class="partial-detail">${detail}</small>`:''}</div><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div>`;
+      const onAction=async(button,target)=>{
+        if(target==='paid'){if(!item.paid)openPaymentChoice(item,list,work);return}
+        if(target==='partial'){
+          if(item.paid){alert('Unlock this fully paid period first.');return}
+          openPaymentChoice(item,list,work,true);return;
+        }
+        if(payStatus(item)==='unpaid')return;
         const buttons=button.closest('.pay-status-toggle').querySelectorAll('button');
         buttons.forEach(choice=>choice.disabled=true);
         button.classList.add('is-loading');
         try{
-        if(!markPaid){
+        if(item.paid){
           const accountPassword=prompt('Enter your account password to unlock this pay period:');
           if(!accountPassword)return;
           const {error:authError}=await sb.auth.signInWithPassword({email:user.email,password:accountPassword});
           if(authError){alert('Incorrect password.');return}
-          const {error:updateError}=await sb.from('pay_periods').update({paid:false,paid_at:null}).eq('workplace_id',workplaceId).eq('period_start',item.period_start).eq('period_end',item.period_end).eq('user_id',user.id);
-          if(updateError){alert(updateError.message);return}
         }else{
-          if(!list.length){alert('Add at least one shift before marking this period paid.');return}
-          if(!confirm('Mark this period paid and lock its shifts?'))return;
-          const {error:saveError}=await sb.from('pay_periods').upsert({user_id:user.id,workplace_id:workplaceId,period_start:item.period_start,period_end:item.period_end,paid:true,paid_at:new Date().toISOString()},{onConflict:'workplace_id,period_start,period_end'});
-          if(saveError){alert(saveError.message);return}
+          if(!confirm('Clear the recorded partial payment and mark this period Unpaid?'))return;
         }
-        await renderPay();await updateWorkSummary();enhanceDashboard();
+        const changes={paid:false,paid_at:null};
+        if(+item.amount_received>0)changes.amount_received=0;
+        const {error:updateError}=await sb.from('pay_periods').update(changes).eq('workplace_id',workplaceId).eq('period_start',item.period_start).eq('period_end',item.period_end).eq('user_id',user.id);
+        if(updateError)throw updateError;
+        await refreshPaymentViews();
         }catch(error){alert(error.message||'Unable to update pay status.')}
         finally{buttons.forEach(choice=>choice.disabled=false);button.classList.remove('is-loading')}
       };
-      const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.paid==='true')}});
+      const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.status)}});
       bindChoices(row);
       const bindShare=container=>{container.querySelector('.period-share-action').onclick=function(){sharePeriod({work,range:item,shifts:list,button:this})}};
       bindShare(row);
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
         const tableRow=document.createElement('tr');
-        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
+        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h${detail?`<small class="partial-detail">${detail}</small>`:''}</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
         bindChoices(tableRow);
         bindShare(tableRow);
         $('periodRows').appendChild(tableRow);
