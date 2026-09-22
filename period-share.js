@@ -1,4 +1,4 @@
-window.createPeriodSharing=({cash,h,earn,dt,formatRange})=>{
+window.createPeriodSharing=({h,dt,formatRange})=>{
   const modal=document.createElement('div');
   modal.id='sharePeriodModal';
   modal.className='modal';
@@ -56,9 +56,6 @@ window.createPeriodSharing=({cash,h,earn,dt,formatRange})=>{
       ctx.fillText(label,x,y);
     };
     const hours=shifts.reduce((sum,shift)=>sum+h(shift),0);
-    const rated=shifts.filter(shift=>shift.rate!=null);
-    const earnings=rated.reduce((sum,shift)=>sum+(earn(shift)||0),0);
-    const incomplete=rated.length!==shifts.length;
     ctx.fillStyle='#edf3ff';ctx.fillRect(0,0,width,height);
     rounded(28,26,width-56,height-52,28,'#ffffff');
     const gradient=ctx.createLinearGradient(48,48,712,195);
@@ -79,8 +76,8 @@ window.createPeriodSharing=({cash,h,earn,dt,formatRange})=>{
     rounded(378,361,318,107,17,'#e8f7f1');
     write('WORKED HOURS',82,392,'bold 14px Arial, sans-serif','#5b6d8a');
     write(hours.toFixed(2)+' h',82,445,'bold 39px Arial, sans-serif','#17233d');
-    write('ESTIMATED GROSS',397,392,'bold 14px Arial, sans-serif','#548775');
-    write(rated.length?cash(earnings):'—',397,445,'bold 36px Arial, sans-serif','#17233d',280);
+    write('SHIFTS LOGGED',397,392,'bold 14px Arial, sans-serif','#548775');
+    write(String(shifts.length),397,445,'bold 39px Arial, sans-serif','#17233d');
 
     write('DAILY WORK',64,514,'bold 15px Arial, sans-serif','#315ddc');
     ctx.fillStyle='#dfe6f2';ctx.fillRect(64,531,632,1);
@@ -97,8 +94,7 @@ window.createPeriodSharing=({cash,h,earn,dt,formatRange})=>{
       ctx.fillStyle='#e7ecf5';ctx.fillRect(64,y+57,632,1);
     });
     const footerY=553+rowCount*72;
-    write('Gross is an estimate before taxes and deductions.',64,footerY+12,'14px Arial, sans-serif','#68758d');
-    if(incomplete)write('Some shifts have no rate; estimated gross excludes them.',64,footerY+35,'13px Arial, sans-serif','#a46616');
+    write('Personal work log. Hours exclude unpaid breaks.',64,footerY+12,'14px Arial, sans-serif','#68758d');
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Could not create the report image.')),'image/png'));
     const filename=`my-tracker-${range.period_start}-to-${range.period_end}.png`;
     return new File([blob],filename,{type:'image/png'});

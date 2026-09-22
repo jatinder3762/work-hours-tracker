@@ -5,7 +5,7 @@ window.initPayPeriodUI=()=>{
   const statusButtons=item=>`<div class="pay-status-toggle" role="group" aria-label="Payment status for ${formatRange(item.period_start,item.period_end)}"><button type="button" class="btn pay-status-choice ${item.paid?'':'is-unpaid'}" data-paid="false" aria-pressed="${!item.paid}">Unpaid</button><button type="button" class="btn pay-status-choice ${item.paid?'is-paid':''}" data-paid="true" aria-pressed="${!!item.paid}">Paid</button></div>`;
   const periodShifts=(work,range)=>ws(work.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
   const shiftHours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
-  const sharePeriod=window.createPeriodSharing({cash,h,earn,dt,formatRange});
+  const sharePeriod=window.createPeriodSharing({h,dt,formatRange});
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
     // Only paid records retain their historical boundaries. Unpaid rows are regenerated
     // from the workplace's current schedule so a changed week start cannot count hours twice.
