@@ -2,6 +2,7 @@ window.initPayPeriodUI=()=>{
   const formatDate=value=>dt(value).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   const formatRange=(start,end)=>`${formatDate(start)}${start.slice(0,4)===end.slice(0,4)?'':' '+start.slice(0,4)} – ${dt(end).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}`;
   const periodLabel=work=>`${freq(work.pay_frequency)} pay period`;
+  const statusButtons=item=>`<div class="pay-status-toggle" role="group" aria-label="Payment status for ${formatRange(item.period_start,item.period_end)}"><button type="button" class="btn pay-status-choice ${item.paid?'':'is-unpaid'}" data-paid="false" aria-pressed="${!item.paid}">Unpaid</button><button type="button" class="btn pay-status-choice ${item.paid?'is-paid':''}" data-paid="true" aria-pressed="${!!item.paid}">Paid</button></div>`;
   const periodShifts=(work,range)=>ws(work.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
   const shiftHours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
@@ -213,7 +214,7 @@ window.initPayPeriodUI=()=>{
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Mark a period paid after its shifts have been paid.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status</th><th>Action</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Select Paid after you receive payment. Switching back to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment status</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   ensureSummary().insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyToggle').onclick=async function(){
@@ -234,27 +235,29 @@ window.initPayPeriodUI=()=>{
     if(!current)return;
     const workplaceId=current.id;
     if(!$('payModal').hidden)$('payPeriods').innerHTML='<div class="list-loading"><span class="spinner"></span> Loading pay periods…</div>';
-    if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="6"><span class="spinner"></span> Loading pay periods…</td></tr>';
+    if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="5"><span class="spinner"></span> Loading pay periods…</td></tr>';
     let data,error;
     try{({data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
     catch(cause){error=cause}
     if(!current||current.id!==workplaceId)return;
-    if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
+    if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="5">Unable to load pay periods.</td></tr>';return}
     const periods=buildPeriodHistory(current,ws(workplaceId).map(shift=>shift.date),data||[],period(current));
     $('payPeriods').innerHTML='';
     $('periodRows').innerHTML='';
     $('historyMore').hidden=periods.length<=visiblePeriods;
-    if(!periods.length)$('periodRows').innerHTML='<tr><td colspan="6">No pay periods yet.</td></tr>';
+    if(!periods.length)$('periodRows').innerHTML='<tr><td colspan="5">No pay periods yet.</td></tr>';
     periods.slice(0,Math.max(visiblePeriods,24)).forEach((item,index)=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
       const row=document.createElement('div');
       row.className='shift pay-period-row';
-      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div><button class="btn ${item.paid?'success':'warning'}">${item.paid?'Paid · Unlock':'Mark Paid'}</button>`;
-      const onAction=async button=>{
-        button.disabled=true;
+      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div>${statusButtons(item)}`;
+      const onAction=async(button,markPaid)=>{
+        if(markPaid===!!item.paid)return;
+        const buttons=button.closest('.pay-status-toggle').querySelectorAll('button');
+        buttons.forEach(choice=>choice.disabled=true);
         button.classList.add('is-loading');
         try{
-        if(item.paid){
+        if(!markPaid){
           const accountPassword=prompt('Enter your account password to unlock this pay period:');
           if(!accountPassword)return;
           const {error:authError}=await sb.auth.signInWithPassword({email:user.email,password:accountPassword});
@@ -269,14 +272,15 @@ window.initPayPeriodUI=()=>{
         }
         await renderPay();await updateWorkSummary();enhanceDashboard();
         }catch(error){alert(error.message||'Unable to update pay status.')}
-        finally{button.disabled=false;button.classList.remove('is-loading')}
+        finally{buttons.forEach(choice=>choice.disabled=false);button.classList.remove('is-loading')}
       };
-      row.querySelector('button').onclick=function(){onAction(this)};
+      const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.paid==='true')}});
+      bindChoices(row);
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
         const tableRow=document.createElement('tr');
-        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status"><span class="badge ${item.paid?'success':'warning'}">${item.paid?'Paid':'Unpaid'}</span></td><td data-label="Action"><button type="button" class="btn ${item.paid?'secondary':'primary'}">${item.paid?'Unlock':'Mark Paid'}</button></td>`;
-        tableRow.querySelector('button').onclick=function(){onAction(this)};
+        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Payment status">${statusButtons(item)}</td>`;
+        bindChoices(tableRow);
         $('periodRows').appendChild(tableRow);
       }
     });
