@@ -5,6 +5,7 @@ window.initPayPeriodUI=()=>{
   const statusButtons=item=>`<div class="pay-status-toggle" role="group" aria-label="Payment status for ${formatRange(item.period_start,item.period_end)}"><button type="button" class="btn pay-status-choice ${item.paid?'':'is-unpaid'}" data-paid="false" aria-pressed="${!item.paid}">Unpaid</button><button type="button" class="btn pay-status-choice ${item.paid?'is-paid':''}" data-paid="true" aria-pressed="${!!item.paid}">Paid</button></div>`;
   const periodShifts=(work,range)=>ws(work.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
   const shiftHours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
+  const sharePeriod=window.createPeriodSharing({cash,h,earn,dt,formatRange});
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
     // Only paid records retain their historical boundaries. Unpaid rows are regenerated
     // from the workplace's current schedule so a changed week start cannot count hours twice.
@@ -214,7 +215,7 @@ window.initPayPeriodUI=()=>{
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Select Paid after you receive payment. Switching back to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment status</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Choose the week start in Workplace settings. Select Paid after you receive payment. Switching back to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   ensureSummary().insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyToggle').onclick=async function(){
@@ -248,9 +249,10 @@ window.initPayPeriodUI=()=>{
     if(!periods.length)$('periodRows').innerHTML='<tr><td colspan="5">No pay periods yet.</td></tr>';
     periods.slice(0,Math.max(visiblePeriods,24)).forEach((item,index)=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
+      const work=current;
       const row=document.createElement('div');
       row.className='shift pay-period-row';
-      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(current)}</small></div>${statusButtons(item)}`;
+      row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(work)}</small></div><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div>`;
       const onAction=async(button,markPaid)=>{
         if(markPaid===!!item.paid)return;
         const buttons=button.closest('.pay-status-toggle').querySelectorAll('button');
@@ -276,11 +278,14 @@ window.initPayPeriodUI=()=>{
       };
       const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.paid==='true')}});
       bindChoices(row);
+      const bindShare=container=>{container.querySelector('.period-share-action').onclick=function(){sharePeriod({work,range:item,shifts:list,button:this})}};
+      bindShare(row);
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
         const tableRow=document.createElement('tr');
-        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Payment status">${statusButtons(item)}</td>`;
+        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
         bindChoices(tableRow);
+        bindShare(tableRow);
         $('periodRows').appendChild(tableRow);
       }
     });
