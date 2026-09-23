@@ -2,6 +2,88 @@ window.initShiftUI=()=>{
   const form=document.getElementById('shiftForm');
   const saveButton=document.getElementById('saveBtn');
   if(!form||!saveButton)return;
+  const editor=$('shiftEditor'), action=$('shiftAction'), summary=$('selectedShiftSummary'), choices=$('shiftChoices');
+  let actionRequest=0;
+  const displayDate=date=>dt(date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  const selectedShifts=()=>current&&selected?shifts.filter(shift=>shift.workplaceId===current.id&&shift.date===selected):[];
+  const closeEditor=()=>{
+    actionRequest++;
+    editor.hidden=true;
+    choices.hidden=true;
+    choices.innerHTML='';
+    form.hidden=false;
+    form.querySelectorAll('input,select').forEach(field=>field.disabled=false);
+    saveButton.hidden=false;
+    action.setAttribute('aria-expanded','false');
+  };
+  const updateAction=()=>{
+    const matches=selectedShifts();
+    action.textContent=!selected?'＋ Add New Shift':matches.length>1?`View / Edit Shifts — ${displayDate(selected)}`:matches.length?`Edit Shift — ${displayDate(selected)}`:`＋ Add Shift — ${displayDate(selected)}`;
+    summary.textContent=!selected?'Select a date to add or edit a shift.':matches.length?`${displayDate(selected)} • ${matches.reduce((total,shift)=>total+h(shift),0).toFixed(2)} h • ${matches.length} ${matches.length===1?'shift':'shifts'}`:`${displayDate(selected)} • No shift recorded`;
+    if(selected&&matches.length){
+      const date=selected,id=current.id;
+      paidOn(date).then(locked=>{
+        if(locked&&current?.id===id&&selected===date){
+          action.textContent=`View ${matches.length===1?'Shift':'Shifts'} — ${displayDate(date)}`;
+        }
+      }).catch(()=>{});
+    }
+  };
+  const showForm=(shift,locked=false)=>{
+    cancel();
+    editor.hidden=false;
+    action.setAttribute('aria-expanded','true');
+    if(shift){
+      editing=shift.id;
+      selected=shift.date;
+      $('date').value=shift.date;
+      $('start').value=shift.start;
+      $('end').value=shift.end;
+      $('breakMin').value=shift.breakMin;
+      $('formTitle').textContent=locked?'View shift':'Edit shift';
+      saveButton.textContent='Update shift';
+      msg(locked?'This shift is in a paid period. Unlock the period to edit it.':shift.rate==null?'Rate not assigned.':'Recorded rate: '+cash(shift.rate)+'/h');
+    }else{
+      $('date').value=selected||day(new Date());
+      $('formTitle').textContent='Add shift';
+    }
+    if(locked){form.querySelectorAll('input,select').forEach(field=>field.disabled=true);saveButton.hidden=true}
+    $('cancelEdit').hidden=false;
+    editor.scrollIntoView({behavior:'smooth',block:'nearest'});
+  };
+  const paidOn=async date=>{
+    const {data,error}=await sb.from('pay_periods').select('period_start').eq('workplace_id',current.id).eq('user_id',user.id).eq('paid',true).lte('period_start',date).gte('period_end',date).limit(1);
+    if(error)throw error;
+    return !!data?.length;
+  };
+  action.onclick=async()=>{
+    const workplaceId=current?.id,date=selected||day(new Date()),token=++actionRequest;
+    action.disabled=true;action.classList.add('is-loading');
+    try{
+      const locked=await paidOn(date);
+      if(token!==actionRequest||current?.id!==workplaceId||date!==(selected||day(new Date())))return;
+      const matches=selectedShifts();
+      if(locked&&!matches.length){msg('This date is in a paid period. Unlock the period before adding a shift.',true);return}
+      if(matches.length>1){
+        closeEditor();
+        editor.hidden=false;form.hidden=true;choices.hidden=false;
+        $('formTitle').textContent=locked?'View shifts':'Choose a shift to edit';
+        matches.forEach(shift=>{
+          const button=document.createElement('button');
+          button.type='button';button.className='btn secondary shift-choice';
+          button.textContent=`${shift.start}–${shift.end} • ${h(shift).toFixed(2)} h`;
+          button.onclick=()=>showForm(shift,locked);
+          choices.appendChild(button);
+        });
+        action.setAttribute('aria-expanded','true');
+        editor.scrollIntoView({behavior:'smooth',block:'nearest'});
+      }else showForm(matches[0],locked);
+    }catch(error){msg(error.message||'Unable to check the pay period.',true)}
+    finally{action.disabled=false;action.classList.remove('is-loading')}
+  };
+  const baseCancel=cancel;
+  cancel=function(){baseCancel();closeEditor()};
+  $('cancelEdit').onclick=cancel;
 
   const recentButton=document.createElement('button');
   recentButton.type='button';
@@ -35,6 +117,7 @@ window.initShiftUI=()=>{
         cell.title=date>day(new Date())?'Future shifts cannot be entered.':'Before this workplace started.';
       }
     });
+    updateAction();
   };
 
   const renderRecent=items=>{
@@ -50,16 +133,14 @@ window.initShiftUI=()=>{
       const gross=earn(shift);
       row.innerHTML=`<td>${dt(shift.date).toLocaleDateString()}</td><td>${safe(shift.start)}–${safe(shift.end)}<small>${shift.breakMin} min break</small></td><td>${h(shift).toFixed(2)} h</td><td>${gross==null?'—':cash(gross)}</td><td><div class="row-actions"><button type="button" class="btn secondary copy">Copy</button><button type="button" class="btn secondary edit">Edit</button><button type="button" class="btn secondary danger delete">Delete</button></div></td>`;
       row.querySelector('.copy').onclick=()=>{
+        cancel();editor.hidden=false;action.setAttribute('aria-expanded','true');
         editing='';$('date').value=day(new Date());$('start').value=shift.start;$('end').value=shift.end;
         $('breakMin').value=shift.breakMin;$('formTitle').textContent='Copy shift';$('saveBtn').textContent='Save shift';$('cancelEdit').hidden=false;
         form.scrollIntoView({behavior:'smooth',block:'center'});
       };
       row.querySelector('.edit').onclick=()=>{
-        editing=shift.id;selected=shift.date;$('date').value=shift.date;$('start').value=shift.start;
-        $('end').value=shift.end;$('breakMin').value=shift.breakMin;$('formTitle').textContent='Edit shift';
-        $('saveBtn').textContent='Update shift';$('cancelEdit').hidden=false;
-        msg(shift.rate==null?'Rate not assigned.':'Recorded rate: '+cash(shift.rate)+'/h');
-        form.scrollIntoView({behavior:'smooth',block:'center'});
+        selected=shift.date;viewDate=dt(shift.date);renderWork();
+        action.click();
       };
       row.querySelector('.delete').onclick=async function(){
         if(!confirm('Delete this shift?'))return;
@@ -96,7 +177,12 @@ window.initShiftUI=()=>{
     requestId++;recentOpen=false;$('shiftList').hidden=true;$('shiftList').innerHTML='';
     recentButton.textContent='Show recent shifts';recentButton.setAttribute('aria-expanded','false');
     baseOpenWork(id);
+    selected='';calendar(ws(current.id));
   };
+  for(const id of ['prevMonth','nextMonth']){
+    const button=$(id),baseClick=button.onclick;
+    button.onclick=()=>{selected='';cancel();baseClick()};
+  }
   recentButton.onclick=async()=>{
     recentOpen=!recentOpen;
     $('shiftList').hidden=!recentOpen;
