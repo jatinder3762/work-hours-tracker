@@ -1,6 +1,29 @@
 window.initDataErrorUI=()=>{
   const originalAlert=window.alert.bind(window);
   let retryAttempted=false;
+  let diagnosticVersion=0;
+  let loadFailureCount=0;
+  let pendingLoad;
+
+  window.wrapTrackerDataLoad=()=>{
+    const originalLoad=load;
+    load=function(...args){
+      if(pendingLoad)return pendingLoad;
+      const failuresBefore=loadFailureCount;
+      pendingLoad=Promise.resolve().then(()=>originalLoad.apply(this,args)).then(result=>{
+        if(loadFailureCount===failuresBefore){
+          diagnosticVersion++;
+          retryAttempted=false;
+          const box=document.getElementById('dataErrorPanel');
+          if(box)box.hidden=true;
+        }
+        return result;
+      }).finally(()=>{
+        pendingLoad=null;
+      });
+      return pendingLoad;
+    };
+  };
 
   const panel=()=>{
     let element=document.getElementById('dataErrorPanel');
@@ -19,6 +42,7 @@ window.initDataErrorUI=()=>{
   };
 
   const diagnose=async()=>{
+    const version=++diagnosticVersion;
     const box=panel();
     const message=box.querySelector('#dataErrorMessage');
     const details=box.querySelector('#dataErrorDetails');
@@ -29,6 +53,7 @@ window.initDataErrorUI=()=>{
 
     try{
       const {data:sessionData,error:sessionError}=await sb.auth.getSession();
+      if(version!==diagnosticVersion)return;
       if(sessionError||!sessionData?.session){
         message.textContent='Your sign-in session has expired. Sign out, then sign in again.';
         return;
@@ -41,12 +66,13 @@ window.initDataErrorUI=()=>{
         ['user_preferences',sb.from('user_preferences').select('user_id').limit(1)]
       ];
       const results=await Promise.all(checks.map(async([name,request])=>[name,await request]));
+      if(version!==diagnosticVersion)return;
       const failures=results.filter(([,result])=>result.error).map(([name,result])=>({name,error:result.error}));
 
       if(!failures.length&&!retryAttempted){
         retryAttempted=true;
         message.textContent='The connection was interrupted temporarily. Retrying now…';
-        window.setTimeout(()=>load(),900);
+        window.setTimeout(()=>{if(version===diagnosticVersion)load()},900);
         return;
       }
 
@@ -64,6 +90,7 @@ window.initDataErrorUI=()=>{
       details.hidden=false;
       code.textContent=failures.map(({name,error})=>`${name}: ${error.message||'Unknown error'}${error.code?` (${error.code})`:''}`).join('\n');
     }catch(error){
+      if(version!==diagnosticVersion)return;
       message.textContent='Unable to reach Supabase. Check your internet connection, then tap Retry.';
       details.hidden=false;
       code.textContent=error?.message||'Network request failed';
@@ -71,7 +98,7 @@ window.initDataErrorUI=()=>{
   };
 
   window.alert=(message)=>{
-    if(String(message).includes('Rate History database update is not ready')){diagnose();return;}
+    if(String(message).includes('Rate History database update is not ready')){loadFailureCount++;diagnose();return;}
     originalAlert(message);
   };
 };
