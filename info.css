@@ -1,0 +1,24 @@
+@import url('./style.css');
+html{scroll-behavior:smooth}
+.info-site{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(circle at 90% 0,#e5f9fa 0,transparent 30%),#f7faff}
+.info-header,.info-main,.info-footer{width:min(1060px,calc(100% - 40px));margin-inline:auto}
+.info-header{min-height:86px;display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid #e0e8f4}
+.info-header .welcome-brand{text-decoration:none;color:var(--ink)}
+.info-main{flex:1;padding:52px 0 88px;display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:50px}
+.info-article{min-width:0;max-width:730px}
+.info-intro h1{font-size:clamp(38px,5vw,58px);line-height:1.06;letter-spacing:-.055em;margin:10px 0 16px}
+.info-lead{font-size:18px;line-height:1.7;color:#54637c;margin:0 0 30px}
+.info-meta{font-size:13px;color:#708099;margin:0 0 30px}
+.info-section{background:#fff;border:1px solid #e2e9f4;border-radius:22px;padding:25px 29px;margin:16px 0;box-shadow:0 10px 30px #2a417011}
+.info-section h2{font-size:21px;letter-spacing:-.035em;margin:0 0 13px}
+.info-section h3{font-size:16px;margin:20px 0 7px}
+.info-section p,.info-section li{color:#4d5c75;line-height:1.7}
+.info-section p{margin:10px 0}.info-section p:last-child{margin-bottom:0}
+.info-section ul,.info-section ol{padding-left:21px;margin:10px 0}
+.info-section a,.info-aside a{color:#275fcf;text-underline-offset:3px}
+.info-aside{align-self:start;position:sticky;top:22px;background:#eaf3ff;border:1px solid #d6e5fb;border-radius:22px;padding:23px}
+.info-aside h2{font-size:17px;margin:0 0 12px}.info-aside p{font-size:14px;line-height:1.6;color:#566780;margin:0 0 17px}.info-aside .btn{display:block;text-align:center;text-decoration:none}
+.info-footer{border-top:1px solid #dde7f3;padding:25px 0 40px;display:flex;justify-content:space-between;align-items:center;gap:20px;color:#64738d;font-size:13px}
+.info-footer .footer-links{display:flex;flex-wrap:wrap;gap:12px 20px}
+.info-footer .footer-links a[aria-current="page"]{color:#17375d;font-weight:800;text-decoration:underline;text-underline-offset:5px}
+@media(max-width:760px){.info-main{grid-template-columns:1fr;gap:12px;padding:35px 0 60px}.info-aside{position:static;order:-1}.info-section{padding:21px}.info-footer{align-items:flex-start;flex-direction:column}.info-header{min-height:76px}.info-header .btn{font-size:13px;padding:10px}}
