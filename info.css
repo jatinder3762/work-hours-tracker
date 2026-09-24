@@ -4,6 +4,7 @@ html{scroll-behavior:smooth}
 .info-header,.info-main,.info-footer{width:min(1060px,calc(100% - 40px));margin-inline:auto}
 .info-header{min-height:86px;display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid #e0e8f4}
 .info-header .welcome-brand{text-decoration:none;color:var(--ink)}
+.info-header .btn{text-decoration:none}
 .info-main{flex:1;padding:52px 0 88px;display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:50px}
 .info-article{min-width:0;max-width:730px}
 .info-intro h1{font-size:clamp(38px,5vw,58px);line-height:1.06;letter-spacing:-.055em;margin:10px 0 16px}
@@ -16,6 +17,7 @@ html{scroll-behavior:smooth}
 .info-section p{margin:10px 0}.info-section p:last-child{margin-bottom:0}
 .info-section ul,.info-section ol{padding-left:21px;margin:10px 0}
 .info-section a,.info-aside a{color:#275fcf;text-underline-offset:3px}
+.info-aside .btn.primary{color:#fff;text-decoration:none}
 .info-aside{align-self:start;position:sticky;top:22px;background:#eaf3ff;border:1px solid #d6e5fb;border-radius:22px;padding:23px}
 .info-aside h2{font-size:17px;margin:0 0 12px}.info-aside p{font-size:14px;line-height:1.6;color:#566780;margin:0 0 17px}.info-aside .btn{display:block;text-align:center;text-decoration:none}
 .info-footer{border-top:1px solid #dde7f3;padding:25px 0 40px;display:flex;justify-content:space-between;align-items:center;gap:20px;color:#64738d;font-size:13px}
