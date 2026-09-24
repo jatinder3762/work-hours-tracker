@@ -236,6 +236,16 @@ window.initPayPeriodUI=()=>{
     const range=period(current);
     const all=ws(workplaceId);
     const currentList=periodShifts(current,range);
+    let rateHelp=document.getElementById('rateHelp');
+    if(!rateHelp){
+      rateHelp=document.createElement('div');
+      rateHelp.id='rateHelp';
+      rateHelp.className='rate-help';
+      rateHelp.innerHTML='<div><strong>Earnings need an hourly rate</strong><p>Some saved shifts have no rate. Add a rate effective on or before those shifts, then choose to apply it to unrated shifts.</p></div><button type="button" class="btn primary">Add hourly rate</button>';
+      document.querySelector('#workplaceView .stats')?.insertAdjacentElement('beforebegin',rateHelp);
+      rateHelp.querySelector('button').onclick=()=>{$('workSettings').click();$('addRate').click()};
+    }
+    rateHelp.hidden=!all.some(shift=>shift.rate==null)||!all.length;
     const hoursLabel=$('workHours')?.previousElementSibling;
     const earningsLabel=$('workEarn')?.previousElementSibling;
     if(hoursLabel)hoursLabel.textContent='Current period hours';

@@ -31,6 +31,13 @@ input,select,textarea{font-size:16px}
 .workspace-grid{grid-template-columns:minmax(0,1fr)}
 
 /* My Tracker 2.0 public homepage */
+body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!important}
+.rate-help{margin:0 0 18px;padding:16px 20px;border:1px solid #f1d8a3;border-radius:16px;background:#fff9ec;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.rate-help p{margin:5px 0 0;color:#6b5b3f;font-size:13px}
+.rate-help .btn{flex:none}
+.rate-help[hidden]{display:none}
+.rate-backfill{display:flex;gap:10px;align-items:flex-start;line-height:1.45}.rate-backfill input{width:18px;min-height:18px;margin:1px 0 0;flex:none}
+@media(max-width:720px){.rate-help{align-items:stretch;flex-direction:column}}
 .welcome[hidden],#appShell[hidden]{display:none!important}
 .welcome{min-height:100vh;background:radial-gradient(circle at 75% 4%,#dff9fb 0,transparent 27%),radial-gradient(circle at 8% 26%,#e8efff 0,transparent 30%),#f7faff;color:#17233d}
 .welcome-header,.welcome-hero,.welcome-benefits,.welcome-steps,.welcome-end,.welcome-footer{width:min(1160px,calc(100% - 44px));margin-inline:auto}

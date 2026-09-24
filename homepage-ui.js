@@ -18,6 +18,7 @@ window.initHomepageUI=()=>{
   window.myTrackerAuthState=loggedIn=>{
     home.hidden=loggedIn;
     shell.hidden=!loggedIn;
+    document.body.classList.toggle('is-signed-out',!loggedIn);
     closeSignIn();
   };
   document.querySelectorAll('[data-home-signin]').forEach(button=>button.onclick=openSignIn);

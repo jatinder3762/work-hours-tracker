@@ -41,6 +41,7 @@ window.initAccountUI=()=>{
     get('accountPasswordForm').reset();
   };
   const open=(isRecovery=false)=>{
+    if(!isRecovery&&!window.myTrackerHasSession)return;
     recovery=isRecovery;
     get('accountTitle').textContent=isRecovery?'Set a new password':'Account settings';
     get('accountDescription').textContent=isRecovery
@@ -68,7 +69,7 @@ window.initAccountUI=()=>{
       get('accountEmail').textContent=session.user.email;
       get('userEmailSide').textContent=session.user.email;
     }
-    if(authEvent==='PASSWORD_RECOVERY')open(true);
+    if(authEvent==='PASSWORD_RECOVERY'&&session?.user)open(true);
     if(authEvent==='SIGNED_OUT'){
       window.myTrackerRecoveryPending=false;
       window.myTrackerAccountEmail='';
@@ -78,7 +79,7 @@ window.initAccountUI=()=>{
       get('userEmailSide').textContent='—';
     }
   });
-  if(window.myTrackerRecoveryPending)open(true);
+  if(window.myTrackerRecoveryPending&&window.myTrackerHasSession)open(true);
   else if(window.myTrackerAccountEmail){
     get('userEmailSide').textContent=window.myTrackerAccountEmail;
   }
