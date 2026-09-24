@@ -55,3 +55,14 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 @media(max-width:720px){.welcome-header,.welcome-hero,.welcome-benefits,.welcome-steps,.welcome-end,.welcome-footer{width:min(100% - 32px,560px)}.welcome-header{height:76px}.welcome-brand small{display:none}.welcome-nav{gap:8px}.welcome-nav .btn{font-size:12px;padding:10px 12px}.welcome-nav .welcome-link{font-size:12px}.welcome-hero{display:flex;flex-direction:column;align-items:stretch;gap:47px;padding:46px 0 80px}.welcome-copy h1{font-size:clamp(42px,10vw,60px)}.welcome-lead{font-size:16px}.welcome-preview{transform:none;margin-right:8px}.welcome-benefits{padding:60px 0}.benefit-grid{grid-template-columns:1fr;gap:12px}.benefit-grid article{padding:22px}.welcome-steps{grid-template-columns:1fr;padding:28px;gap:25px}.welcome-end{padding:78px 0}.auth-modal{align-items:center;padding:16px}.auth-modal .auth-card{border-radius:24px;max-height:calc(100vh - 32px)}}
 @media(max-width:390px){.welcome-brand strong{font-size:16px}.welcome-logo{width:37px;height:37px}.welcome-nav .btn{padding:9px}.welcome-cta{align-items:flex-start;flex-direction:column;gap:12px}.preview-stats strong{font-size:19px}.preview-example{font-size:8px}}
 #signupModal{z-index:24}
+
+/* Workplace editor: keep the form and its actions usable in a short viewport. */
+#workModal .modal-card{width:min(820px,calc(100vw - 36px));max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#abb5c5 transparent}
+#workModal .form{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px}
+#workModal .form>label:first-of-type,#workModal #rateHistoryBox,#workModal .modal-actions{grid-column:1/-1}
+#workModal #rateHistoryBox{min-width:0}
+#workModal #rateHistoryBox .row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+#workModal #rateHistoryBox .row strong{font-size:16px}
+#workModal #addRate{display:inline-flex;align-items:center;justify-content:center;min-height:42px;white-space:nowrap;font-size:14px;padding:10px 14px}
+#workModal .modal-actions{position:sticky;bottom:-22px;z-index:2;background:#fff;border-top:1px solid var(--line);margin:4px -22px -22px;padding:14px 22px 22px;box-shadow:0 -12px 20px -18px #17233d66}
+@media(max-width:720px){#workModal .modal-card{width:100%;max-height:calc(100dvh - 20px)}#workModal .form{grid-template-columns:1fr}#workModal .modal-actions{bottom:calc(-22px - env(safe-area-inset-bottom));margin:4px -18px calc(-22px - env(safe-area-inset-bottom));padding:14px 18px calc(18px + env(safe-area-inset-bottom))}#workModal #rateHistoryBox .row{align-items:stretch}#workModal #addRate{width:100%}}
