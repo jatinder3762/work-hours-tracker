@@ -102,6 +102,7 @@ window.initAuthUI=()=>{
         }
         closeSignup();
         email.value=emailValue;
+        window.openTrackerSignIn?.();
         showSuccess('Account created. Check your email and confirm your address before signing in.');
       }catch(error){
         signupError('Unable to connect. Check your internet connection and try again.');
