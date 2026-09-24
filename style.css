@@ -74,3 +74,21 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 @media(prefers-reduced-motion:reduce){.month-bar{transition:none}}
 @media(max-width:720px){.welcome-footer{align-items:flex-start;flex-direction:column}.app-footer{padding:0 18px 100px;flex-direction:column;align-items:flex-start}}
 @media(max-width:720px){#workModal .modal-card{width:100%;max-height:calc(100dvh - 20px)}#workModal .form{grid-template-columns:1fr}#workModal .modal-actions{bottom:calc(-22px - env(safe-area-inset-bottom));margin:4px -18px calc(-22px - env(safe-area-inset-bottom));padding:14px 18px calc(18px + env(safe-area-inset-bottom))}#workModal #rateHistoryBox .row{align-items:stretch}#workModal #addRate{width:100%}}
+
+/* A minute travels across the work bars and lands on earnings. */
+.splash{overflow:hidden;text-align:center;background:radial-gradient(circle at 50% 38%,#e4f5ff 0,#f7faff 55%)}
+.splash .brand-symbol{position:relative;z-index:1;animation:splashBreathe 2.1s ease-in-out infinite}
+.splash h1,.splash>p,.splash-track{position:relative;z-index:1}
+.splash-track{display:flex;align-items:center;gap:12px;width:min(265px,calc(100vw - 52px));height:61px;margin:28px auto 0;padding:9px 13px;border:1px solid #d6e5f7;border-radius:20px;background:#fff;box-shadow:0 12px 32px #2962e81a;color:var(--blue)}
+.splash-time,.splash-earn{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:11px;font-size:23px;font-weight:800;background:#edf4ff}
+.splash-earn{background:#e5f9f6;color:#098d85;font-size:19px;animation:earnPulse 1.9s ease-in-out infinite}
+.splash-bars{display:flex;align-items:flex-end;justify-content:space-between;flex:1;height:33px;gap:5px}
+.splash-bars i{display:block;flex:1;height:42%;border-radius:4px 4px 2px 2px;background:linear-gradient(180deg,var(--aqua),var(--blue));animation:hourRise 1.9s ease-in-out infinite;animation-delay:calc(var(--n)*.13s)}
+.splash-bars i:nth-child(1){--n:0}.splash-bars i:nth-child(2){--n:1}.splash-bars i:nth-child(3){--n:2}.splash-bars i:nth-child(4){--n:3}.splash-bars i:nth-child(5){--n:4}.splash-bars i:nth-child(6){--n:5}.splash-bars i:nth-child(7){--n:6}
+.splash .splash-status{margin-top:16px;font-size:13px;font-weight:650;color:#61748e}
+@keyframes hourRise{0%,85%,100%{height:24%;opacity:.45}35%,60%{height:94%;opacity:1}}
+@keyframes earnPulse{0%,45%,100%{box-shadow:none;transform:scale(1)}65%{box-shadow:0 0 0 6px #14b8c823;transform:scale(1.08)}}
+@keyframes splashBreathe{50%{transform:translateY(-3px);box-shadow:0 15px 34px #2962e84a}}
+@media(prefers-reduced-motion:reduce){.splash .brand-symbol,.splash-bars i,.splash-earn{animation:none}.splash-bars i{height:62%;opacity:1}}
+.mobile-shift-action{display:none}
+@media(max-width:720px){.mobile-shift-action{display:block;margin-top:19px;padding-top:16px;border-top:1px solid var(--line)}.mobile-shift-action .btn{width:100%;min-height:48px}.calendar-card .calendar-head{margin-top:22px}.calendar-selection{margin-top:15px;padding-top:15px}}

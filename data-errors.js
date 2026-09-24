@@ -20,6 +20,7 @@ window.initDataErrorUI=()=>{
         return result;
       }).finally(()=>{
         pendingLoad=null;
+        window.dispatchEvent(new Event('mytracker:data-ready'));
       });
       return pendingLoad;
     };

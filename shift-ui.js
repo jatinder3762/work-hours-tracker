@@ -3,6 +3,14 @@ window.initShiftUI=()=>{
   const saveButton=document.getElementById('saveBtn');
   if(!form||!saveButton)return;
   const editor=$('shiftEditor'), action=$('shiftAction'), summary=$('selectedShiftSummary'), choices=$('shiftChoices');
+  const actionHome=action.parentElement;
+  const mobileAction=document.createElement('div');
+  mobileAction.className='mobile-shift-action';
+  document.querySelector('.calendar-card .calendar-head').before(mobileAction);
+  const mobileScreen=window.matchMedia('(max-width:720px)');
+  const placeAction=()=>{(mobileScreen.matches?mobileAction:actionHome).appendChild(action)};
+  mobileScreen.addEventListener('change',placeAction);
+  placeAction();
   let actionRequest=0;
   const displayDate=date=>dt(date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   const selectedShifts=()=>current&&selected?shifts.filter(shift=>shift.workplaceId===current.id&&shift.date===selected):[];
