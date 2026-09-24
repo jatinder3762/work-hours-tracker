@@ -1,4 +1,4 @@
-const CACHE='my-tracker-v32';
+const CACHE='my-tracker-v33';
 const ASSETS=['./','./index.html','./about.html','./terms.html','./privacy.html','./help.html','./info.css','./style.css','./data-errors.js','./auth-ui.js','./homepage-ui.js','./account-ui.js','./shift-ui.js','./period-share.js','./pay-ui.js','./charts-ui.js','./app.js','./app-core.js','./manifest.json','./icon.svg'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)));self.skipWaiting()});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))));self.clients.claim()});

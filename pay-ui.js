@@ -117,6 +117,47 @@ window.initPayPeriodUI=()=>{
   };
 
   let currentPeriodRecord=null;
+  let calendarStatusWorkId=null;
+  let calendarStatusRows=[];
+  let calendarStatusLoaded=false;
+  const calendarLegend=document.createElement('div');
+  calendarLegend.className='calendar-pay-legend';
+  calendarLegend.hidden=true;
+  calendarLegend.setAttribute('aria-label','Pay period colours');
+  calendarLegend.innerHTML='<span><i class="legend-paid" aria-hidden="true"></i>Paid</span><span><i class="legend-partial" aria-hidden="true"></i>Partially paid</span><span><i class="legend-current" aria-hidden="true"></i>Current period</span><small>Colours show pay periods, not worked shifts.</small>';
+  document.querySelector('.calendar-card .calendar-head').before(calendarLegend);
+  const baseStatusCalendar=calendar;
+  const calendarPayStatus=(date,rows,range,today)=>{
+    const saved=rows.filter(item=>date>=item.period_start&&date<=item.period_end);
+    if(saved.some(item=>item.paid))return 'paid';
+    if(saved.some(item=>+item.amount_received>0))return 'partial';
+    return date>=range.start&&date<=range.end&&date<=today?'current':null;
+  };
+  const paintCalendarStatus=()=>{
+    calendarLegend.hidden=!current||!calendarStatusLoaded||calendarStatusWorkId!==current.id;
+    if(calendarLegend.hidden){document.querySelectorAll('#calendar .day').forEach(cell=>{cell.classList.remove('pay-day-paid','pay-day-partial','pay-day-current');cell.removeAttribute('aria-label');if(cell.dataset.baseTitle!==undefined)cell.title=cell.dataset.baseTitle});return}
+    const currentRange=period(current),today=day(new Date());
+    document.querySelectorAll('#calendar .day:not(.blank)').forEach(cell=>{
+      const number=Number(cell.querySelector('b')?.textContent);
+      if(!number)return;
+      const date=day(new Date(viewDate.getFullYear(),viewDate.getMonth(),number));
+      const status=calendarPayStatus(date,calendarStatusRows,currentRange,today);
+      cell.classList.remove('pay-day-paid','pay-day-partial','pay-day-current');
+      if(status)cell.classList.add('pay-day-'+status);
+      const label=status==='paid'?'Fully paid period':status==='partial'?'Partially paid period':status==='current'?'Current pay period':null;
+      if(cell.dataset.baseTitle===undefined)cell.dataset.baseTitle=cell.title;
+      cell.title=[cell.dataset.baseTitle,label].filter(Boolean).join(' • ');
+      if(label){
+        const worked=cell.querySelector('span')?.textContent;
+        cell.setAttribute('aria-label',[dt(date).toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}),worked?`${worked} worked`:null,label].filter(Boolean).join(', '));
+      }else cell.removeAttribute('aria-label');
+    });
+  };
+  calendar=function(items){
+    if(current?.id!==calendarStatusWorkId){calendarStatusWorkId=current?.id||null;calendarStatusRows=[];calendarStatusLoaded=false}
+    baseStatusCalendar(items);
+    paintCalendarStatus();
+  };
   let choiceContext=null;
   const choiceModal=document.createElement('div');
   choiceModal.id='paymentChoiceModal';
@@ -229,8 +270,10 @@ window.initPayPeriodUI=()=>{
     }catch(_error){}
   };
 
+  let summaryRequest=0;
   const updateWorkSummary=async()=>{
     if(!current)return;
+    const requestId=++summaryRequest;
     ensureSummary();
     const workplaceId=current.id;
     const range=period(current);
@@ -263,8 +306,12 @@ window.initPayPeriodUI=()=>{
     try{
       const {data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId);
       if(error)throw error;
-      if(!current||current.id!==workplaceId)return;
+      if(!current||current.id!==workplaceId||requestId!==summaryRequest)return;
       const periods=data||[];
+      calendarStatusWorkId=workplaceId;
+      calendarStatusRows=periods;
+      calendarStatusLoaded=true;
+      paintCalendarStatus();
       const paidPeriods=periods.filter(item=>item.paid);
       const partialPeriods=periods.filter(item=>!item.paid&&+item.amount_received>0);
       const paidList=all.filter(shift=>paidPeriods.some(item=>shift.date>=item.period_start&&shift.date<=item.period_end));
@@ -282,8 +329,8 @@ window.initPayPeriodUI=()=>{
       action.textContent=isPaid?'View Paid Period':+currentPeriodRecord?.amount_received>0?'Manage payment':'Record payment';
       action.className='btn '+(isPaid?'secondary':'primary');
       action.dataset.paid=String(isPaid);
-    }catch(error){msg(error.message||'Unable to load pay status.',true)}
-    finally{if(current?.id===workplaceId){currentAction.disabled=false;currentAction.classList.remove('is-loading')}}
+    }catch(error){if(requestId===summaryRequest){calendarStatusLoaded=false;paintCalendarStatus();msg(error.message||'Unable to load pay status.',true)}}
+    finally{if(current?.id===workplaceId&&requestId===summaryRequest){currentAction.disabled=false;currentAction.classList.remove('is-loading')}}
   };
 
   async function markCurrentPaid(){
@@ -305,7 +352,12 @@ window.initPayPeriodUI=()=>{
     enhanceDashboard();
   };
   const baseRenderWork=renderWork;
-  renderWork=function(){baseRenderWork();updateWorkSummary();if(!$('historyContent').hidden)renderPay()};
+  let browsingCalendar=false;
+  for(const id of ['prevMonth','nextMonth','todayBtn']){
+    const button=$(id),previousClick=button.onclick;
+    button.onclick=function(...args){browsingCalendar=true;try{return previousClick.apply(this,args)}finally{browsingCalendar=false}};
+  }
+  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();if(!$('historyContent').hidden)renderPay()}};
 
   const history=document.createElement('section');
   history.id='periodHistory';
