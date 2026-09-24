@@ -1,7 +1,6 @@
 window.initChartUI=()=>{
   const monthKey=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
   const hours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
-  const colors=['#2962e8','#3878ed','#4c8eea','#13a8bc','#0e9c9f','#0a8d80','#08765d'];
 
   const dashboard=document.createElement('section');
   dashboard.id='hoursTrend';
@@ -10,12 +9,12 @@ window.initChartUI=()=>{
   dashboard.innerHTML='<div class="chart-heading"><div><p class="eyebrow">WORK PATTERNS</p><h2>Hours over time</h2><p class="muted">All active workplaces · last six months</p></div></div><div class="month-chart" id="monthChart"></div>';
   document.querySelector('#dashboardView .period-card').insertAdjacentElement('afterend',dashboard);
 
-  const workplace=document.createElement('section');
-  workplace.id='weekdayChartCard';
-  workplace.className='card chart-card weekday-card';
-  workplace.hidden=true;
-  workplace.innerHTML='<div class="chart-heading"><div><p class="eyebrow">CURRENT PAY PERIOD</p><h2>When you worked</h2><p class="muted">Hours by weekday</p></div></div><div class="weekday-content"><div class="weekday-donut" id="weekdayDonut"><div class="weekday-center"><strong id="weekdayTotal">0.00 h</strong><small>Total hours</small></div></div><div class="weekday-list" id="weekdayList"></div></div>';
-  document.getElementById('paySummary').insertAdjacentElement('afterend',workplace);
+  const monthOverview=document.createElement('section');
+  monthOverview.id='calendarOverview';
+  monthOverview.className='calendar-overview';
+  monthOverview.hidden=true;
+  monthOverview.innerHTML='<div class="calendar-overview-head"><div><p class="eyebrow">MONTH AT A GLANCE</p><h3 id="overviewRange"></h3></div><div class="overview-totals"><div><small>Hours worked</small><strong id="overviewHours"></strong></div><div><small>Estimated gross</small><strong id="overviewEarnings"></strong></div></div></div><div id="dailyBars" class="daily-bars"></div><div id="dailyTicks" class="daily-ticks" aria-hidden="true"></div><p id="overviewHint" class="overview-hint" hidden></p>';
+  document.getElementById('calendar').insertAdjacentElement('afterend',monthOverview);
 
   function renderDashboardChart(){
     const active=new Set(works.filter(work=>!work.archived).map(work=>work.id));
@@ -47,45 +46,41 @@ window.initChartUI=()=>{
     });
   }
 
-  function renderWorkplaceChart(){
-    if(!current){workplace.hidden=true;return}
-    const range=period(current);
-    const relevant=ws(current.id).filter(shift=>shift.date>=range.start&&shift.date<=range.end);
-    workplace.hidden=!relevant.length;
-    if(!relevant.length)return;
-    const totals=Array.from({length:7},(_,weekday)=>hours(relevant.filter(shift=>dt(shift.date).getDay()===weekday)));
-    const sum=totals.reduce((a,b)=>a+b,0);
-    if(!sum){workplace.hidden=true;return}
-    document.getElementById('weekdayTotal').textContent=`${sum.toFixed(2)} h`;
-    const donut=document.getElementById('weekdayDonut');
-    let offset=0;
-    const slices=totals.map((value,index)=>{
-      const from=offset;
-      offset+=value/sum*100;
-      return value?`${colors[index]} ${from}% ${offset}%`:null;
-    }).filter(Boolean);
-    donut.style.background=`conic-gradient(${slices.join(',')})`;
-    donut.setAttribute('role','img');
-    donut.setAttribute('aria-label','Current pay period: '+totals.map((value,index)=>`${new Date(2023,0,index+1).toLocaleDateString(undefined,{weekday:'long'})} ${value.toFixed(2)} hours`).join('; '));
-    const legend=document.getElementById('weekdayList');
-    legend.replaceChildren();
-    totals.forEach((value,index)=>{
-      if(!value)return;
-      const row=document.createElement('div');
-      row.className='weekday-row';
-      const label=document.createElement('span');
-      const dot=document.createElement('i');
-      dot.style.background=colors[index];
-      label.append(dot,document.createTextNode(new Date(2023,0,index+1).toLocaleDateString(undefined,{weekday:'long'})));
-      const amount=document.createElement('strong');
-      amount.textContent=`${value.toFixed(2)} h`;
-      row.append(label,amount);
-      legend.appendChild(row);
+  function renderMonthOverview(){
+    if(!current){monthOverview.hidden=true;return}
+    monthOverview.hidden=false;
+    const year=viewDate.getFullYear(),month=viewDate.getMonth(),count=new Date(year,month+1,0).getDate();
+    const relevant=ws(current.id).filter(shift=>shift.date.slice(0,7)===monthKey(viewDate));
+    const daily=Array.from({length:count},()=>0);
+    relevant.forEach(shift=>{daily[Number(shift.date.slice(8))-1]+=h(shift)});
+    const max=Math.max(1,...daily),bars=document.getElementById('dailyBars'),ticks=document.getElementById('dailyTicks');
+    bars.replaceChildren();ticks.replaceChildren();
+    bars.style.setProperty('--day-count',count);
+    ticks.style.setProperty('--day-count',count);
+    document.getElementById('overviewRange').textContent=`${viewDate.toLocaleDateString(undefined,{month:'short'})} 1–${count}`;
+    document.getElementById('overviewHours').textContent=`${hours(relevant).toFixed(2)} h`;
+    document.getElementById('overviewEarnings').textContent=has(relevant)?cash(total(relevant)):'—';
+    const hint=document.getElementById('overviewHint');
+    hint.hidden=!!relevant.length&&has(relevant);
+    hint.textContent=relevant.length?'Add a pay rate to see complete estimated earnings.':'No shifts recorded this month.';
+    bars.setAttribute('role','img');
+    bars.setAttribute('aria-label',`${viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'})} hours by day: ${daily.map((value,index)=>value?`${index+1}: ${value.toFixed(2)} hours`:null).filter(Boolean).join('; ')||'no hours recorded'}`);
+    daily.forEach((value,index)=>{
+      const column=document.createElement('span');
+      column.className='daily-column'+(day(new Date(year,month,index+1))===selected?' is-selected':'');
+      const bar=document.createElement('span');
+      bar.className='daily-bar';
+      bar.style.height=value?`${Math.max(5,value/max*100)}%`:'0';
+      column.appendChild(bar);
+      bars.appendChild(column);
+      const tick=document.createElement('small');
+      if(index===0||index===7||index===14||index===21||index===count-1)tick.textContent=String(index+1);
+      ticks.appendChild(tick);
     });
   }
 
   const previousDash=renderDash;
   renderDash=function(){previousDash();renderDashboardChart()};
-  const previousWork=renderWork;
-  renderWork=function(){previousWork();renderWorkplaceChart()};
+  const previousCalendar=calendar;
+  calendar=function(items){previousCalendar(items);renderMonthOverview()};
 };
