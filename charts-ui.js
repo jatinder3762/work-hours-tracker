@@ -14,7 +14,7 @@ window.initChartUI=()=>{
   monthOverview.className='calendar-overview';
   monthOverview.hidden=true;
   monthOverview.innerHTML='<div class="calendar-overview-head"><div><p class="eyebrow">MONTH AT A GLANCE</p><h3 id="overviewRange"></h3></div><div class="overview-totals"><div><small>Hours worked</small><strong id="overviewHours"></strong></div><div><small>Estimated gross</small><strong id="overviewEarnings"></strong></div></div></div><div id="dailyBars" class="daily-bars"></div><div id="dailyTicks" class="daily-ticks" aria-hidden="true"></div><p id="overviewHint" class="overview-hint" hidden></p>';
-  document.getElementById('calendar').insertAdjacentElement('afterend',monthOverview);
+  document.querySelector('.calendar-pay-legend, .calendar-card .calendar-head').before(monthOverview);
 
   function renderDashboardChart(){
     const active=new Set(works.filter(work=>!work.archived).map(work=>work.id));
