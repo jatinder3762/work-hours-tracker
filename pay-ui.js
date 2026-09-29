@@ -363,7 +363,7 @@ window.initPayPeriodUI=()=>{
   history.id='periodHistory';
   history.className='card period-history';
   history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
-  ensureSummary().insertAdjacentElement('afterend',history);
+  document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyToggle').onclick=async function(){
     $('historyContent').hidden=!$('historyContent').hidden;

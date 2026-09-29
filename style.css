@@ -111,3 +111,21 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 /* The selected-day shift form stays visible below the calendar. */
 #shiftAction[hidden]{display:none!important}.shift-editor .card-head{flex-wrap:wrap}.shift-editor .card-head .btn[hidden]{display:none!important}.shift-choice.active{border-color:#86a7ed;background:#eaf1ff;color:var(--blue)}
 @media(max-width:720px){.calendar-card .calendar-selection{margin-top:14px}.calendar-card .shift-editor{margin-top:15px}.calendar-card .shift-editor .card-head .btn{width:100%}}
+
+/* Work Detail 2.1: overview, persistent entry, calendar, then history. */
+#workplaceView .workspace-grid{display:grid;grid-template-columns:minmax(280px,.78fr) minmax(0,1.22fr);align-items:start;gap:18px;margin-bottom:20px}
+#workChartSlot{grid-column:1/-1;padding:22px 26px}
+#workChartSlot:has(.calendar-overview[hidden]){display:none}
+#workChartSlot .calendar-overview{margin:0;padding:0;border:0;box-shadow:none;background:transparent}
+#workplaceView .shift-entry-card{min-width:0}
+#workplaceView .shift-entry-card .calendar-selection{margin:0 0 16px;padding:0 0 15px}
+#workplaceView .shift-entry-card .shift-editor{margin:0;padding:0;border:0;background:transparent;animation:none}
+#workplaceView .shift-entry-card .shift-editor .form{max-width:none}
+#workplaceView .calendar-card{min-width:0}
+#workplaceView .period-history{margin-top:0}
+.recent-shifts-card{margin-top:18px}
+.recent-shifts-list{display:grid;gap:8px;margin-top:14px}
+.recent-shift-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:#f9fbff}
+.recent-shift-row small{display:block;color:var(--muted);margin-top:3px}
+@media(max-width:1000px){#workplaceView .workspace-grid{grid-template-columns:1fr}#workChartSlot{grid-column:1}#workplaceView .shift-entry-card{order:1}#workplaceView .calendar-card{order:2}}
+@media(max-width:720px){#workChartSlot{padding:18px 15px}#workplaceView .shift-entry-card .calendar-selection{align-items:flex-start}#workplaceView .shift-entry-card .calendar-selection p{width:auto}.recent-shifts-card .card-head{align-items:flex-start;flex-wrap:wrap}.recent-shifts-card .card-head button{width:100%}}
