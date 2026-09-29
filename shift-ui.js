@@ -3,34 +3,6 @@ window.initShiftUI=()=>{
   const saveButton=document.getElementById('saveBtn');
   if(!form||!saveButton)return;
   const editor=$('shiftEditor'), action=$('shiftAction'), summary=$('selectedShiftSummary'), choices=$('shiftChoices');
-  const recentToggle=$('recentShiftsToggle'), recentContent=$('recentShiftsContent');
-  let recentRequest=0;
-  recentToggle.onclick=async()=>{
-    if(!recentContent.hidden){recentRequest++;recentContent.hidden=true;recentToggle.textContent='Show recent shifts';recentToggle.setAttribute('aria-expanded','false');return}
-    if(!current||!user)return;
-    const workplaceId=current.id,request=++recentRequest;
-    recentContent.hidden=false;
-    recentToggle.textContent='Hide recent shifts';
-    recentToggle.setAttribute('aria-expanded','true');
-    $('recentShiftsNote').textContent='Loading recent shifts…';
-    $('recentShiftsList').replaceChildren();
-    try{
-      const {data,error}=await sb.from('shifts').select('id,shift_date,start_time,end_time,break_minutes').eq('user_id',user.id).eq('workplace_id',workplaceId).order('shift_date',{ascending:false}).order('start_time',{ascending:false}).limit(20);
-      if(error)throw error;
-      if(request!==recentRequest||current?.id!==workplaceId)return;
-      $('recentShiftsNote').textContent=data?.length?'Most recent 20 shifts':'No shifts recorded yet.';
-      (data||[]).forEach(row=>{
-        const item=document.createElement('div');item.className='recent-shift-row';
-        const details=document.createElement('div');
-        const title=document.createElement('strong');title.textContent=dt(row.shift_date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
-        const time=document.createElement('small');time.textContent=`${row.start_time.slice(0,5)}–${row.end_time.slice(0,5)} · ${row.break_minutes||0} min break`;
-        details.append(title,time);
-        const button=document.createElement('button');button.type='button';button.className='btn secondary';button.textContent='Open date';
-        button.onclick=()=>{viewDate=dt(row.shift_date);selected=row.shift_date;calendar(ws(workplaceId));$('shiftEditor').scrollIntoView({behavior:'smooth',block:'start'})};
-        item.append(details,button);$('recentShiftsList').appendChild(item);
-      });
-    }catch(error){if(request===recentRequest)$('recentShiftsNote').textContent=error.message||'Unable to load recent shifts.'}
-  };
   action.hidden=true;
   editor.hidden=false;
   const addAnother=document.createElement('button');
@@ -144,15 +116,6 @@ window.initShiftUI=()=>{
     updateEditor();
   };
 
-  const baseOpenWork=openWork;
-  openWork=function(id){
-    recentRequest++;
-    recentContent.hidden=true;
-    recentToggle.textContent='Show recent shifts';
-    recentToggle.setAttribute('aria-expanded','false');
-    $('recentShiftsList').replaceChildren();
-    baseOpenWork(id);
-  };
   for(const id of ['prevMonth','nextMonth']){
     const button=$(id),baseClick=button.onclick;
     button.onclick=()=>{selected='';cancel();baseClick()};

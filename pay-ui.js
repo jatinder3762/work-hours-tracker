@@ -357,20 +357,14 @@ window.initPayPeriodUI=()=>{
     const button=$(id),previousClick=button.onclick;
     button.onclick=function(...args){browsingCalendar=true;try{return previousClick.apply(this,args)}finally{browsingCalendar=false}};
   }
-  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();if(!$('historyContent').hidden)renderPay()}};
+  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();renderPay()}};
 
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div><button type="button" id="historyToggle" class="btn secondary" aria-expanded="false" aria-controls="historyContent">Show periods</button></div><div id="historyContent" hidden><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div></div><div id="historyContent"><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
-  $('historyToggle').onclick=async function(){
-    $('historyContent').hidden=!$('historyContent').hidden;
-    $('historyToggle').setAttribute('aria-expanded',String(!$('historyContent').hidden));
-    $('historyToggle').textContent=$('historyContent').hidden?'Show periods':'Hide periods';
-    if(!$('historyContent').hidden){this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}}
-  };
   $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
   const basePayClick=$('payBtn').onclick;
   $('payBtn').onclick=async function(){
