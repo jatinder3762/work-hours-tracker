@@ -357,40 +357,84 @@ window.initPayPeriodUI=()=>{
     const button=$(id),previousClick=button.onclick;
     button.onclick=function(...args){browsingCalendar=true;try{return previousClick.apply(this,args)}finally{browsingCalendar=false}};
   }
-  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();renderPay()}};
+  renderWork=function(){baseRenderWork();if(!browsingCalendar)updateWorkSummary()};
 
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div></div><div id="historyContent"><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
-  document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div></div><div id="historyContent"><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  $('paymentsView').appendChild(history);
   let visiblePeriods=12;
   $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
-  const basePayClick=$('payBtn').onclick;
-  $('payBtn').onclick=async function(){
-    if(this.disabled)return;
-    this.disabled=true;this.classList.add('is-loading');
-    try{await basePayClick()}finally{this.disabled=false;this.classList.remove('is-loading')}
+  let paymentWork=null;
+  const paymentsNav=$('paymentsNav');
+  const mobilePayments=document.createElement('button');
+  mobilePayments.id='mPayments';mobilePayments.type='button';mobilePayments.className='btn';mobilePayments.textContent='Payments';
+  $('mobileNav').insertBefore(mobilePayments,$('mReports'));
+  const previousShow=show;
+  show=function(id){
+    $('paymentsView').hidden=id!=='paymentsView';
+    if(id==='paymentsView'){
+      previousShow('dashboardView');
+      $('dashboardView').hidden=true;
+      for(const name of ['dashNav','reportsNav','accountNav','mDash','mReports','mAccount'])$(name)?.classList.remove('active');
+      paymentsNav.classList.add('active');mobilePayments.classList.add('active');
+    }else{
+      previousShow(id);
+      paymentsNav.classList.remove('active');mobilePayments.classList.remove('active');
+    }
   };
+  const paymentSelect=$('paymentWorkplace');
+  const syncPaymentWorkplaces=()=>{
+    const selectedId=paymentWork?.id||paymentSelect.value;
+    paymentSelect.replaceChildren();
+    works.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(work=>{
+      const option=document.createElement('option');option.value=work.id;
+      option.textContent=work.name+(work.archived?' (archived)':'');
+      paymentSelect.appendChild(option);
+    });
+    paymentSelect.value=works.some(work=>work.id===selectedId)?selectedId:paymentSelect.options[0]?.value||'';
+    paymentWork=works.find(work=>work.id===paymentSelect.value)||null;
+    $('paymentOpenWork').disabled=!paymentWork;
+    $('periodHistory').hidden=!paymentWork;
+    $('paymentEmpty').hidden=!!paymentWork;
+  };
+  const openPayments=(workplaceId)=>{
+    syncPaymentWorkplaces();
+    if(workplaceId&&works.some(work=>work.id===workplaceId))paymentSelect.value=workplaceId;
+    paymentWork=works.find(work=>work.id===paymentSelect.value)||null;
+    $('periodHistory').hidden=!paymentWork;
+    $('paymentEmpty').hidden=!!paymentWork;
+    show('paymentsView');
+    if(paymentWork)renderPay();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+  $('payBtn').onclick=()=>openPayments(current?.id);
+  paymentsNav.onclick=()=>openPayments();
+  mobilePayments.onclick=()=>openPayments();
+  paymentSelect.onchange=()=>{paymentWork=works.find(work=>work.id===paymentSelect.value)||null;visiblePeriods=12;$('periodHistory').hidden=!paymentWork;$('paymentEmpty').hidden=!!paymentWork;$('paymentOpenWork').disabled=!paymentWork;if(paymentWork)renderPay()};
+  $('paymentOpenWork').onclick=()=>{if(paymentWork)openWork(paymentWork.id)};
+  const previousRenderDash=renderDash;
+  renderDash=function(){previousRenderDash();syncPaymentWorkplaces();if(!$('paymentsView').hidden&&paymentWork)renderPay()};
 
+  let payRequest=0;
   renderPay=async function(){
-    if(!current)return;
-    const workplaceId=current.id;
+    if(!paymentWork)return;
+    const request=++payRequest,work=paymentWork,workplaceId=work.id;
     if(!$('payModal').hidden)$('payPeriods').innerHTML='<div class="list-loading"><span class="spinner"></span> Loading pay periods…</div>';
-    if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="5"><span class="spinner"></span> Loading pay periods…</td></tr>';
+    if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="6"><span class="spinner"></span> Loading pay periods…</td></tr>';
     let data,error;
-    try{({data,error}=await sb.from('pay_periods').select('*').eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
+    try{({data,error}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
     catch(cause){error=cause}
-    if(!current||current.id!==workplaceId)return;
-    if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="5">Unable to load pay periods.</td></tr>';return}
-    const periods=buildPeriodHistory(current,ws(workplaceId).map(shift=>shift.date),data||[],period(current));
+    if(request!==payRequest||!paymentWork||paymentWork.id!==workplaceId)return;
+    if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
+    const periods=buildPeriodHistory(work,ws(workplaceId).map(shift=>shift.date),data||[],period(work));
     $('payPeriods').innerHTML='';
     $('periodRows').innerHTML='';
     $('historyMore').hidden=periods.length<=visiblePeriods;
-    if(!periods.length)$('periodRows').innerHTML='<tr><td colspan="5">No pay periods yet.</td></tr>';
+    if(!periods.length)$('periodRows').innerHTML='<tr><td colspan="6">No pay periods yet.</td></tr>';
     periods.slice(0,Math.max(visiblePeriods,24)).forEach((item,index)=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
-      const work=current;
       const progress=partialProgress(list,item.amount_received);
       const detail=!item.paid&&+item.amount_received>0?`${cash(+item.amount_received)} received · ${progress.covered.toFixed(2)} h est. covered · ${progress.pending.toFixed(2)} h pending`:'';
       const row=document.createElement('div');
@@ -429,8 +473,11 @@ window.initPayPeriodUI=()=>{
       bindShare(row);
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
+        const paymentDetail=item.paid
+          ?`Fully paid${item.paid_at?' · '+new Date(item.paid_at).toLocaleDateString():''}${+item.amount_received>0?' · '+cash(+item.amount_received)+' recorded':''}`
+          :+item.amount_received>0?`${cash(+item.amount_received)} received · ${progress.covered.toFixed(2)} h est. covered · ${progress.pending.toFixed(2)} h pending`:'No payment recorded';
         const tableRow=document.createElement('tr');
-        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h${detail?`<small class="partial-detail">${detail}</small>`:''}</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
+        tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h${detail?`<small class="partial-detail">${detail}</small>`:''}</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Payment details">${paymentDetail}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
         bindChoices(tableRow);
         bindShare(tableRow);
         $('periodRows').appendChild(tableRow);
