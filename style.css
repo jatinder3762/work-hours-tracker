@@ -133,5 +133,11 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 .payment-filter .btn{min-height:44px;white-space:nowrap}
 .payments-page .period-history{margin:0}
 .payments-page #periodHistory table{min-width:900px}
+
+/* The dashboard opens with workplaces; its Add action stays within reach. */
+#dashboardView .content-section{margin-top:0}
+#dashboardView .section-title{align-items:center}
+#dashboardView .section-title .add-work{flex:none}
+@media(max-width:720px){#dashboardView .section-title .add-work{position:fixed;right:18px;bottom:82px;z-index:8;width:56px;height:56px;border-radius:18px;padding:0;font-size:0;display:grid;place-items:center;box-shadow:0 13px 28px rgba(41,98,232,.34)}#dashboardView .section-title .add-work span{font-size:27px}}
 @media(max-width:720px){.payments-page .payment-filter{display:grid;grid-template-columns:1fr}.payment-filter label{min-width:0}.payment-filter .btn{width:100%}.payments-page #periodHistory table{min-width:0}#periodRows td:nth-child(6){grid-column:1/-1}#periodRows td:nth-child(6) .period-row-controls{justify-content:flex-start}}
 @media(max-width:560px){#mobileNav .btn:first-child:not(.active){color:#60708b!important;background:transparent!important}#mobileNav .btn{font-size:12px;padding-inline:3px!important}}
