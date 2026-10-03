@@ -2,11 +2,11 @@ window.initChartUI=()=>{
   const monthKey=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
   const hours=list=>list.reduce((sum,shift)=>sum+h(shift),0);
 
-  // Keep the dashboard focused on workplaces; aggregate insights belong to Payments.
+  // Keep the dashboard focused on workplaces; aggregate insights belong to Reports.
   const dashboardView=document.getElementById('dashboardView');
-  const paymentsView=document.getElementById('paymentsView');
+  const reportsView=document.getElementById('reportsView');
   const workSummary=dashboardView.querySelector('.period-card');
-  paymentsView.querySelector('.page-heading').after(workSummary);
+  reportsView.querySelector('.page-heading').after(workSummary);
   const addWork=document.getElementById('addWorkBtn');
   dashboardView.querySelector('.section-title .desktop-hint').remove();
   dashboardView.querySelector('.section-title').appendChild(addWork);

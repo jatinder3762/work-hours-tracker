@@ -142,9 +142,8 @@ window.initPayPeriodUI=()=>{
     if(calendarLegend.hidden){document.querySelectorAll('#calendar .day').forEach(cell=>{cell.classList.remove('pay-day-paid','pay-day-partial','pay-day-current');cell.removeAttribute('aria-label');if(cell.dataset.baseTitle!==undefined)cell.title=cell.dataset.baseTitle});return}
     const currentRange=period(current),today=day(new Date());
     document.querySelectorAll('#calendar .day:not(.blank)').forEach(cell=>{
-      const number=Number(cell.querySelector('b')?.textContent);
-      if(!number)return;
-      const date=day(new Date(viewDate.getFullYear(),viewDate.getMonth(),number));
+      const date=cell.dataset.date;
+      if(!date)return;
       const status=calendarPayStatus(date,calendarStatusRows,currentRange,today);
       cell.classList.remove('pay-day-paid','pay-day-partial','pay-day-current');
       if(status)cell.classList.add('pay-day-'+status);
@@ -269,7 +268,7 @@ window.initPayPeriodUI=()=>{
     summary.id='paySummary';
     summary.className='card pay-summary';
     summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
-    document.querySelector('#workplaceView .stats')?.insertAdjacentElement('afterend',summary);
+    document.querySelector('#workplaceView .workspace-grid')?.insertAdjacentElement('afterend',summary);
     const carryover=document.createElement('section');
     carryover.id='carryoverSummary';carryover.className='card carryover-summary';carryover.hidden=true;
     carryover.innerHTML='<div class="card-head"><div><p class="eyebrow">OUTSTANDING PAY</p><h2>Earlier balance and this period</h2></div><button id="carryoverAll" type="button" class="btn secondary">View payments</button></div><div class="carryover-totals"><div><small>Current period pending (est.)</small><strong id="carryCurrent">—</strong></div><div><small>Earlier periods pending (est.)</small><strong id="carryEarlier">—</strong></div><div><small>Combined outstanding (est.)</small><strong id="carryCombined">—</strong></div></div><div id="carryoverRows" class="carryover-rows"></div><p class="muted carryover-note">Previous balances stay with their original periods. Estimates compare gross earnings with recorded receipts; deductions may change your actual pay.</p>';
@@ -296,6 +295,11 @@ window.initPayPeriodUI=()=>{
       if(metrics[1]){metrics[1].querySelector('strong').textContent=has(list)?cash(total(list)):'—';metrics[1].querySelector('small').textContent='CURRENT EARNINGS'}
       const meta=card.querySelector('.meta');
       if(meta)meta.innerHTML=`${periodLabel(work)} · ${formatDate(range.start)}–${formatDate(range.end)} <span class="badge period-card-status warning">Unpaid</span>`;
+      let extra=card.querySelector('.work-card-extra');
+      if(!extra){extra=document.createElement('div');extra.className='work-card-extra';card.appendChild(extra)}
+      const latest=rates.filter(rate=>rate.workplace_id===work.id&&rate.effective_from<=day(new Date()))
+        .sort((a,b)=>b.effective_from.localeCompare(a.effective_from))[0];
+      extra.textContent=`${work.pay_frequency==='monthly'?'Monthly':work.pay_frequency==='biweekly'?'Biweekly':'Weekly'} schedule · ${latest?cash(latest.hourly_rate)+'/h':'Rate not set'}`;
       matches.push({work,range,card});
     });
     try{
@@ -304,6 +308,11 @@ window.initPayPeriodUI=()=>{
         const item=(data||[]).find(row=>row.workplace_id===work.id&&row.period_start===range.start&&row.period_end===range.end);
         const badge=card.querySelector('.period-card-status');
         if(item){badge.textContent=statusName(item);badge.className='badge period-card-status '+(item.paid?'success':+item.amount_received>0?'partial':'warning')}
+        const old=buildPeriodHistory(work,ws(work.id).map(shift=>shift.date),(data||[]).filter(row=>row.workplace_id===work.id),range)
+          .filter(row=>row.period_end<range.start&&!row.paid)
+          .map(row=>outstanding(periodShifts(work,{start:row.period_start,end:row.period_end}),row))
+          .filter(amount=>amount!=null&&amount>0);
+        if(old.length)card.querySelector('.work-card-extra').textContent+=` · ${old.length} earlier ${old.length===1?'period':'periods'} pending (${cash(old.reduce((sum,value)=>sum+value,0))} est.)`;
       });
     }catch(_error){}
   };
@@ -420,76 +429,28 @@ window.initPayPeriodUI=()=>{
     const button=$(id),previousClick=button.onclick;
     button.onclick=function(...args){browsingCalendar=true;try{return previousClick.apply(this,args)}finally{browsingCalendar=false}};
   }
-  renderWork=function(){baseRenderWork();if(!browsingCalendar)updateWorkSummary()};
+  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();renderPay()}};
 
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Weeks and pay periods</h2></div></div><div id="historyContent"><p class="muted">Select Paid to choose full or partial payment. Only fully paid periods lock their shifts. Returning a fully paid period to Unpaid requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
-  $('paymentsView').appendChild(history);
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Pay periods</h2></div></div><div id="historyContent"><p class="muted">The calendar shows weekly totals. Record Paid, Partial, or Unpaid for each original pay period below. Only fully paid periods lock shifts; unlocking requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
-  let paymentWork=null;
-  const paymentsNav=$('paymentsNav');
-  const mobilePayments=document.createElement('button');
-  mobilePayments.id='mPayments';mobilePayments.type='button';mobilePayments.className='btn';mobilePayments.textContent='Payments';
-  $('mobileNav').insertBefore(mobilePayments,$('mReports'));
-  const previousShow=show;
-  show=function(id){
-    $('paymentsView').hidden=id!=='paymentsView';
-    if(id==='paymentsView'){
-      previousShow('dashboardView');
-      $('dashboardView').hidden=true;
-      for(const name of ['dashNav','reportsNav','accountNav','mDash','mReports','mAccount'])$(name)?.classList.remove('active');
-      paymentsNav.classList.add('active');mobilePayments.classList.add('active');
-    }else{
-      previousShow(id);
-      paymentsNav.classList.remove('active');mobilePayments.classList.remove('active');
-    }
-  };
-  const paymentSelect=$('paymentWorkplace');
-  const syncPaymentWorkplaces=()=>{
-    const selectedId=paymentWork?.id||paymentSelect.value;
-    paymentSelect.replaceChildren();
-    works.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(work=>{
-      const option=document.createElement('option');option.value=work.id;
-      option.textContent=work.name+(work.archived?' (archived)':'');
-      paymentSelect.appendChild(option);
-    });
-    paymentSelect.value=works.some(work=>work.id===selectedId)?selectedId:paymentSelect.options[0]?.value||'';
-    paymentWork=works.find(work=>work.id===paymentSelect.value)||null;
-    $('paymentOpenWork').disabled=!paymentWork;
-    $('periodHistory').hidden=!paymentWork;
-    $('paymentEmpty').hidden=!!paymentWork;
-  };
-  const openPayments=(workplaceId)=>{
-    syncPaymentWorkplaces();
-    if(workplaceId&&works.some(work=>work.id===workplaceId))paymentSelect.value=workplaceId;
-    paymentWork=works.find(work=>work.id===paymentSelect.value)||null;
-    $('periodHistory').hidden=!paymentWork;
-    $('paymentEmpty').hidden=!!paymentWork;
-    show('paymentsView');
-    if(paymentWork)renderPay();
-    window.scrollTo({top:0,behavior:'smooth'});
-  };
-  $('payBtn').onclick=()=>openPayments(current?.id);
-  paymentsNav.onclick=()=>openPayments();
-  mobilePayments.onclick=()=>openPayments();
-  paymentSelect.onchange=()=>{paymentWork=works.find(work=>work.id===paymentSelect.value)||null;visiblePeriods=12;$('periodHistory').hidden=!paymentWork;$('paymentEmpty').hidden=!!paymentWork;$('paymentOpenWork').disabled=!paymentWork;if(paymentWork)renderPay()};
-  $('paymentOpenWork').onclick=()=>{if(paymentWork)openWork(paymentWork.id)};
-  const previousRenderDash=renderDash;
-  renderDash=function(){previousRenderDash();syncPaymentWorkplaces();if(!$('paymentsView').hidden&&paymentWork)renderPay()};
+  $('payBtn').textContent='Pay periods';
+  $('payBtn').onclick=()=>{$('periodHistory').scrollIntoView({behavior:'smooth',block:'start'})};
 
   let payRequest=0;
   renderPay=async function(){
-    if(!paymentWork)return;
-    const request=++payRequest,work=paymentWork,workplaceId=work.id;
+    if(!current)return;
+    const request=++payRequest,work=current,workplaceId=work.id;
     if(!$('payModal').hidden)$('payPeriods').innerHTML='<div class="list-loading"><span class="spinner"></span> Loading pay periods…</div>';
     if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="6"><span class="spinner"></span> Loading pay periods…</td></tr>';
     let data,error;
     try{({data,error}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
     catch(cause){error=cause}
-    if(request!==payRequest||!paymentWork||paymentWork.id!==workplaceId)return;
+    if(request!==payRequest||!current||current.id!==workplaceId)return;
     if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
     const periods=buildPeriodHistory(work,ws(workplaceId).map(shift=>shift.date),data||[],period(work));
     $('payPeriods').innerHTML='';

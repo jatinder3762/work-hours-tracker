@@ -102,19 +102,68 @@ window.initShiftUI=()=>{
     $('date').min=startDate();
     $('date').max=day(new Date());
   };
-  const baseCalendar=calendar;
+  let monthsBack=2;
+  const monthName=date=>date.toLocaleDateString(undefined,{month:'long',year:'numeric'});
   calendar=function(items){
     syncBounds();
-    baseCalendar(items);
-    document.querySelectorAll('#calendar .day:not(.blank)').forEach(cell=>{
-      const date=day(new Date(viewDate.getFullYear(),viewDate.getMonth(),Number(cell.querySelector('b').textContent)));
-      if(dateError(date)){
-        cell.disabled=true;
-        cell.title=date>day(new Date())?'Future shifts cannot be entered.':'Before this workplace started.';
-      }
+    const container=$('calendar'),scroll=container.scrollTop;
+    container.replaceChildren();
+    const shiftMap=new Map();
+    items.forEach(shift=>{
+      if(!shiftMap.has(shift.date))shiftMap.set(shift.date,[]);
+      shiftMap.get(shift.date).push(shift);
     });
+    for(let offset=0;offset<=monthsBack;offset++){
+      const month=new Date(viewDate.getFullYear(),viewDate.getMonth()-offset,1);
+      const first=new Date(month.getFullYear(),month.getMonth(),1);
+      const last=new Date(month.getFullYear(),month.getMonth()+1,0);
+      const gridStart=new Date(first.getFullYear(),first.getMonth(),1-first.getDay());
+      const weeks=Math.ceil((first.getDay()+last.getDate())/7);
+      const panel=document.createElement('section');panel.className='calendar-month';
+      const title=document.createElement('h3');title.textContent=monthName(month);panel.appendChild(title);
+      const weekdays=document.createElement('div');weekdays.className='calendar-weekdays';
+      ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(name=>{const label=document.createElement('span');label.textContent=name;weekdays.appendChild(label)});
+      panel.appendChild(weekdays);
+      for(let row=0;row<weeks;row++){
+        const week=document.createElement('div');week.className='calendar-week';
+        const weekItems=[];
+        for(let column=0;column<7;column++){
+          const date=day(new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+row*7+column));
+          const daily=shiftMap.get(date)||[];
+          weekItems.push(...daily);
+          const cell=document.createElement('button');cell.type='button';cell.className='day';cell.dataset.date=date;
+          if(date.slice(0,7)!==day(month).slice(0,7))cell.classList.add('outside-month');
+          if(date===selected)cell.classList.add('selected');
+          if(date===day(new Date()))cell.classList.add('today');
+          const number=document.createElement('b');number.textContent=String(Number(date.slice(-2)));cell.appendChild(number);
+          if(daily.length){
+            const hours=document.createElement('span');hours.textContent=daily.reduce((sum,shift)=>sum+h(shift),0).toFixed(2)+' h';cell.appendChild(hours);
+            const earnings=document.createElement('small');earnings.textContent=has(daily)?cash(total(daily)):'Rate needed';cell.appendChild(earnings);
+          }
+          const error=dateError(date);
+          cell.title=error||`${dt(date).toLocaleDateString()}${daily.length?' • '+daily.reduce((sum,shift)=>sum+h(shift),0).toFixed(2)+' h • '+(has(daily)?cash(total(daily)):'Rate needed'):''}`;
+          if(error)cell.disabled=true;
+          cell.onclick=()=>{selected=date;calendar(items)};
+          week.appendChild(cell);
+        }
+        const start=day(new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+row*7));
+        const end=day(new Date(gridStart.getFullYear(),gridStart.getMonth(),gridStart.getDate()+row*7+6));
+        const summary=document.createElement('div');summary.className='calendar-week-total';
+        summary.textContent=`${displayDate(start)}–${displayDate(end)} · ${weekItems.reduce((sum,shift)=>sum+h(shift),0).toFixed(2)} h · ${weekItems.length?(has(weekItems)?cash(total(weekItems)):'Rate needed'):'—'}`;
+        panel.append(week,summary);
+      }
+      container.appendChild(panel);
+    }
+    if(monthsBack<23){
+      const earlier=document.createElement('button');earlier.type='button';earlier.className='btn secondary calendar-earlier';earlier.textContent='Show earlier month';
+      earlier.onclick=()=>{monthsBack++;calendar(items)};container.appendChild(earlier);
+    }
+    container.scrollTop=scroll;
     updateEditor();
   };
+
+  const baseOpenWork=openWork;
+  openWork=function(...args){monthsBack=2;return baseOpenWork.apply(this,args)};
 
   for(const id of ['prevMonth','nextMonth']){
     const button=$(id),baseClick=button.onclick;
