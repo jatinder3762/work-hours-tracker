@@ -16,17 +16,21 @@ window.initPayPeriodUI=()=>{
     const covered=valid?Math.min(hours,Math.max(0,hours*(+amount||0)/gross)):0;
     return{valid,hours,gross,covered,pending:Math.max(0,hours-covered)};
   };
+  const cents=value=>Math.round((Number(value)||0)*100);
+  const moneyFromCents=value=>Math.max(0,value)/100;
+  const outstanding=(list,item)=>item?.paid?0:has(list)?moneyFromCents(cents(total(list))-cents(item?.amount_received)):null;
   const sharePeriod=window.createPeriodSharing({h,dt,formatRange});
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
     // Preserve paid and partially paid ranges. Regenerate untouched unpaid rows
     // from the current schedule so old week anchors cannot count shifts twice.
     const recorded=savedPeriods.filter(item=>item.paid||+item.amount_received>0);
+    const savedByRange=new Map(savedPeriods.map(item=>[`${item.period_start}|${item.period_end}`,item]));
     const ranges=new Map(recorded.map(item=>[`${item.period_start}|${item.period_end}`,item]));
     const addRange=range=>{
       const key=`${range.start}|${range.end}`;
       if(ranges.has(key))return;
       if(recorded.some(item=>item.period_start<=range.end&&item.period_end>=range.start))return;
-      ranges.set(key,{period_start:range.start,period_end:range.end,paid:false});
+      ranges.set(key,savedByRange.get(key)||{period_start:range.start,period_end:range.end,paid:false,amount_received:0});
     };
     addRange(currentRange);
     shiftDates.forEach(date=>addRange(period(work,dt(date))));
@@ -163,27 +167,50 @@ window.initPayPeriodUI=()=>{
   choiceModal.id='paymentChoiceModal';
   choiceModal.className='modal';
   choiceModal.hidden=true;
-  choiceModal.innerHTML='<div class="card modal-card payment-choice-card"><p class="eyebrow">RECORD PAYMENT</p><h2 id="choiceDates">Pay period</h2><p class="muted">Choose how much of this period has been paid.</p><div class="payment-choices"><button type="button" id="chooseFullPayment" class="btn primary">Fully paid</button><button type="button" id="choosePartialPayment" class="btn secondary">Partially paid</button></div><form id="partialPaymentForm" class="form" hidden><label>Total amount received so far (CAD)<input id="partialAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><p id="partialEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Hours are estimated from recorded gross rates. Paycheck deductions can change the amount received. Partial payment keeps the period open.</p><button id="savePartialPayment" class="btn primary wide">Record partial payment</button></form><p id="paymentChoiceError" class="auth-error" role="alert" hidden></p><div class="modal-actions"><button type="button" id="cancelPaymentChoice" class="btn secondary">Cancel</button></div></div>';
+  choiceModal.innerHTML='<div class="card modal-card payment-choice-card"><p class="eyebrow">RECORD PAYMENT</p><h2 id="choiceDates">Pay period</h2><p class="muted">Choose how much of this period has been paid.</p><div class="payment-choices"><button type="button" id="chooseFullPayment" class="btn primary">Fully paid</button><button type="button" id="choosePartialPayment" class="btn secondary">Partially paid</button></div><p id="previousReceipt" class="muted payment-previous"></p><form id="partialPaymentForm" class="form" hidden><label>Additional payment received now (CAD)<input id="partialAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><p id="partialEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Hours are estimated from recorded gross rates. Paycheck deductions can change the amount received. Partial payment keeps the period open. Enter only the new payment, not the earlier total.</p><button id="savePartialPayment" class="btn primary wide">Record partial payment</button></form><form id="fullPaymentForm" class="form" hidden><label>Additional payment received now (CAD) <span>(optional)</span><input id="fullAdditionalAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label><p id="fullPaymentEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Confirm fully paid only when all hours for this original period are settled. This locks its shifts. The amount is recorded with this period, not the current week.</p><button id="confirmFullPayment" class="btn primary wide">Confirm fully paid</button></form><p id="paymentChoiceError" class="auth-error" role="alert" hidden></p><div class="modal-actions"><button type="button" id="cancelPaymentChoice" class="btn secondary">Cancel</button></div></div>';
   document.body.appendChild(choiceModal);
-  const closeChoice=()=>{choiceModal.hidden=true;choiceContext=null;$('partialPaymentForm').hidden=true;$('paymentChoiceError').hidden=true};
+  const closeChoice=()=>{choiceModal.hidden=true;choiceContext=null;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=true;$('paymentChoiceError').hidden=true};
   $('cancelPaymentChoice').onclick=closeChoice;
   choiceModal.onclick=event=>{if(event.target===choiceModal)closeChoice()};
   const choiceError=message=>{$('paymentChoiceError').textContent=message;$('paymentChoiceError').hidden=false};
   const refreshPaymentViews=async()=>{await Promise.all([renderPay(),updateWorkSummary()]);enhanceDashboard()};
+  const saveReceipt=async(item,work,additional,paid)=>{
+    const received=moneyFromCents(cents(item.amount_received)+cents(additional));
+    const changes={amount_received:received,paid,paid_at:paid?new Date().toISOString():null};
+    if(item.id){
+      const {data,error}=await sb.from('pay_periods').update(changes).eq('id',item.id).eq('user_id',user.id).eq('amount_received',+item.amount_received||0).eq('paid',false).select('id').maybeSingle();
+      if(error)throw error;
+      if(!data)throw Error('This payment changed in another session. Reopen the period and check its latest balance.');
+    }else{
+      const {error}=await sb.from('pay_periods').insert({user_id:user.id,workplace_id:work.id,period_start:item.period_start,period_end:item.period_end,...changes});
+      if(error)throw error;
+    }
+    return received;
+  };
   const openPaymentChoice=(item,list,work,showPartial=false)=>{
     choiceContext={item,list,work};
     $('choiceDates').textContent=formatRange(item.period_start,item.period_end);
-    $('partialAmount').value=+item.amount_received>0?(+item.amount_received).toFixed(2):'';
-    $('partialPaymentForm').hidden=true;$('paymentChoiceError').hidden=true;
+    $('previousReceipt').textContent=+item.amount_received>0?`Previously recorded: ${cash(+item.amount_received)}. New payments will be added to this period.`:'No payment recorded for this period yet.';
+    $('partialAmount').value='';$('fullAdditionalAmount').value='';
+    $('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=true;$('paymentChoiceError').hidden=true;
     choiceModal.hidden=false;
     if(showPartial)$('choosePartialPayment').click();
   };
   const updatePartialEstimate=()=>{
     if(!choiceContext)return;
-    const info=partialProgress(choiceContext.list,+$('partialAmount').value);
-    $('partialEstimate').textContent=info.valid?`Estimated paid ${info.covered.toFixed(2)} h · Pending ${info.pending.toFixed(2)} h of ${info.hours.toFixed(2)} h`:'Each shift needs a positive hourly rate before paid hours can be calculated.';
+    const {item,list}=choiceContext;
+    const received=moneyFromCents(cents(item.amount_received)+cents($('partialAmount').value));
+    const info=partialProgress(list,received);
+    $('partialEstimate').textContent=info.valid?`Total recorded: ${cash(received)} · Est. balance ${cash(moneyFromCents(cents(info.gross)-cents(received)))} · ${info.pending.toFixed(2)} h pending`:'Each shift needs a positive hourly rate before paid hours can be estimated.';
   };
   $('partialAmount').oninput=updatePartialEstimate;
+  $('fullAdditionalAmount').oninput=()=>{
+    if(!choiceContext)return;
+    const {item,list}=choiceContext;
+    const before=+item.amount_received||0,additional=+$('fullAdditionalAmount').value||0;
+    const balance=outstanding(list,item);
+    $('fullPaymentEstimate').textContent=`Previously recorded: ${cash(before)} · Additional now: ${cash(additional)} · New recorded total: ${cash(moneyFromCents(cents(before)+cents(additional)))}${balance==null?'':` · Estimated balance before this payment: ${cash(balance)}`}`;
+  };
   $('choosePartialPayment').onclick=async function(){
     if(!choiceContext)return;
     if(!partialProgress(choiceContext.list,0).valid){choiceError('Add a positive rate to every shift before recording a partial payment.');return}
@@ -191,40 +218,46 @@ window.initPayPeriodUI=()=>{
     try{
       const {error}=await sb.from('pay_periods').select('amount_received').limit(1);
       if(error){choiceError('Partial payments need the new Supabase database migration before they can be saved.');return}
-      $('paymentChoiceError').hidden=true;$('partialPaymentForm').hidden=false;updatePartialEstimate();
+      $('paymentChoiceError').hidden=true;$('fullPaymentForm').hidden=true;$('partialPaymentForm').hidden=false;updatePartialEstimate();
       $('partialAmount').focus();
     }catch(error){choiceError(error.message||'Unable to check partial payments.')}
     finally{this.disabled=false;this.classList.remove('is-loading')}
   };
-  $('chooseFullPayment').onclick=async function(){
+  $('chooseFullPayment').onclick=function(){
     if(!choiceContext)return;
     const {item,list,work}=choiceContext;
     if(!list.length){choiceError('Add at least one shift before marking this period fully paid.');return}
-    if(!confirm(`Have all ${shiftHours(list).toFixed(2)} hours been fully paid? This will lock the entire period.`))return;
-    this.disabled=true;this.classList.add('is-loading');
+    $('paymentChoiceError').hidden=true;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=false;
+    $('fullAdditionalAmount').oninput();$('fullAdditionalAmount').focus();
+  };
+  $('fullPaymentForm').onsubmit=async event=>{
+    event.preventDefault();
+    if(!choiceContext)return;
+    const {item,list,work}=choiceContext,raw=$('fullAdditionalAmount').value;
+    const additional=raw===''?0:Number(raw);
+    if(!Number.isFinite(additional)||additional<0){choiceError('Enter a valid additional amount, or leave it blank if no new amount needs recording.');return}
+    if(!confirm(`Have all ${shiftHours(list).toFixed(2)} hours for ${formatRange(item.period_start,item.period_end)} been paid? This will lock that period.`))return;
+    const button=$('confirmFullPayment');button.disabled=true;button.classList.add('is-loading');
     try{
-      const payload={user_id:user.id,workplace_id:work.id,period_start:item.period_start,period_end:item.period_end,paid:true,paid_at:new Date().toISOString()};
-      if(+item.amount_received>0)payload.amount_received=+item.amount_received;
-      const {error}=await sb.from('pay_periods').upsert(payload,{onConflict:'workplace_id,period_start,period_end'});
-      if(error)throw error;
+      await saveReceipt(item,work,additional,true);
       closeChoice();await refreshPaymentViews();
-      msg('Period marked fully paid. Its shifts are now locked.');
+      msg('Original period marked fully paid. Its shifts are now locked.');
     }catch(error){choiceError(error.message||'Unable to mark this period fully paid.')}
-    finally{this.disabled=false;this.classList.remove('is-loading')}
+    finally{button.disabled=false;button.classList.remove('is-loading')}
   };
   $('partialPaymentForm').onsubmit=async event=>{
     event.preventDefault();
     if(!choiceContext)return;
-    const {item,list,work}=choiceContext,info=partialProgress(list,+$('partialAmount').value);
-    const amount=+$('partialAmount').value;
-    if(!Number.isFinite(amount)||amount<=0||!info.valid){choiceError('Enter a valid amount and make sure every shift has a positive rate.');return}
-    if(amount>=info.gross){choiceError('This covers the estimated full period. Choose Fully paid once all hours are confirmed paid.');return}
+    const {item,list,work}=choiceContext;
+    const amount=Number($('partialAmount').value),received=moneyFromCents(cents(item.amount_received)+cents(amount));
+    const info=partialProgress(list,received);
+    if(!Number.isFinite(amount)||amount<=0||!info.valid){choiceError('Enter a valid additional amount and make sure every shift has a positive rate.');return}
+    if(cents(received)>=cents(info.gross)){choiceError('This reaches the estimated gross. Choose Fully paid if all hours are settled.');return}
     const button=$('savePartialPayment');button.disabled=true;button.classList.add('is-loading');
     try{
-      const {error}=await sb.from('pay_periods').upsert({user_id:user.id,workplace_id:work.id,period_start:item.period_start,period_end:item.period_end,paid:false,paid_at:null,amount_received:Math.round(amount*100)/100},{onConflict:'workplace_id,period_start,period_end'});
-      if(error)throw error;
+      await saveReceipt(item,work,amount,false);
       closeChoice();await refreshPaymentViews();
-      msg(`Partial payment recorded. Estimated ${info.covered.toFixed(2)} h covered; ${info.pending.toFixed(2)} h pending.`);
+      msg(`Additional payment recorded against the original period. Total ${cash(received)} received; estimated ${info.pending.toFixed(2)} h pending.`);
     }catch(error){choiceError(error.message||'Unable to record partial payment.')}
     finally{button.disabled=false;button.classList.remove('is-loading')}
   };
@@ -237,6 +270,11 @@ window.initPayPeriodUI=()=>{
     summary.className='card pay-summary';
     summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
     document.querySelector('#workplaceView .stats')?.insertAdjacentElement('afterend',summary);
+    const carryover=document.createElement('section');
+    carryover.id='carryoverSummary';carryover.className='card carryover-summary';carryover.hidden=true;
+    carryover.innerHTML='<div class="card-head"><div><p class="eyebrow">OUTSTANDING PAY</p><h2>Earlier balance and this period</h2></div><button id="carryoverAll" type="button" class="btn secondary">View payments</button></div><div class="carryover-totals"><div><small>Current period pending (est.)</small><strong id="carryCurrent">—</strong></div><div><small>Earlier periods pending (est.)</small><strong id="carryEarlier">—</strong></div><div><small>Combined outstanding (est.)</small><strong id="carryCombined">—</strong></div></div><div id="carryoverRows" class="carryover-rows"></div><p class="muted carryover-note">Previous balances stay with their original periods. Estimates compare gross earnings with recorded receipts; deductions may change your actual pay.</p>';
+    summary.insertAdjacentElement('afterend',carryover);
+    $('carryoverAll').onclick=()=>{$('payBtn').click()};
     document.getElementById('currentPeriodAction').onclick=markCurrentPaid;
     return summary;
   };
@@ -275,6 +313,7 @@ window.initPayPeriodUI=()=>{
     if(!current)return;
     const requestId=++summaryRequest;
     ensureSummary();
+    $('carryoverSummary').hidden=true;
     const workplaceId=current.id;
     const range=period(current);
     const all=ws(workplaceId);
@@ -308,6 +347,30 @@ window.initPayPeriodUI=()=>{
       if(error)throw error;
       if(!current||current.id!==workplaceId||requestId!==summaryRequest)return;
       const periods=data||[];
+      const earlier=buildPeriodHistory(current,all.map(shift=>shift.date),periods,range)
+        .filter(item=>!item.paid&&item.period_end<range.start)
+        .map(item=>({item,list:periodShifts(current,{start:item.period_start,end:item.period_end})}))
+        .filter(entry=>entry.list.length);
+      const currentPending=outstanding(currentList,periods.find(item=>item.period_start===range.start&&item.period_end===range.end));
+      const earlierAmounts=earlier.map(({item,list})=>outstanding(list,item));
+      const earlierPending=earlierAmounts.every(amount=>amount!=null)?earlierAmounts.reduce((sum,amount)=>sum+cents(amount),0)/100:null;
+      $('carryoverSummary').hidden=!earlier.length;
+      $('carryCurrent').textContent=currentPending==null?'—':cash(currentPending);
+      $('carryEarlier').textContent=earlierPending==null?'—':cash(earlierPending);
+      $('carryCombined').textContent=currentPending==null||earlierPending==null?'—':cash(moneyFromCents(cents(currentPending)+cents(earlierPending)));
+      $('carryoverRows').replaceChildren();
+      earlier.slice(0,3).forEach(({item,list})=>{
+        const line=document.createElement('div');line.className='carryover-row';
+        const details=document.createElement('div');
+        const title=document.createElement('strong');title.textContent=formatRange(item.period_start,item.period_end);
+        const note=document.createElement('small');
+        const due=outstanding(list,item);
+        note.textContent=`${statusName(item)} · ${shiftHours(list).toFixed(2)} h · ${due==null?'Rate needed for estimate':cash(due)+' estimated balance'}`;
+        details.append(title,note);
+        const action=document.createElement('button');action.type='button';action.className='btn secondary';action.textContent='Add payment';
+        action.onclick=()=>openPaymentChoice(item,list,current,true);
+        line.append(details,action);$('carryoverRows').appendChild(line);
+      });
       calendarStatusWorkId=workplaceId;
       calendarStatusRows=periods;
       calendarStatusLoaded=true;
@@ -436,7 +499,8 @@ window.initPayPeriodUI=()=>{
     periods.slice(0,Math.max(visiblePeriods,24)).forEach((item,index)=>{
       const list=ws(workplaceId).filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end);
       const progress=partialProgress(list,item.amount_received);
-      const detail=!item.paid&&+item.amount_received>0?`${cash(+item.amount_received)} received · ${progress.covered.toFixed(2)} h est. covered · ${progress.pending.toFixed(2)} h pending`:'';
+      const due=outstanding(list,item);
+      const detail=!item.paid&&+item.amount_received>0?`${cash(+item.amount_received)} received · ${due==null?'Balance unavailable':cash(due)+' est. balance'} · ${progress.pending.toFixed(2)} h pending`:'';
       const row=document.createElement('div');
       row.className='shift pay-period-row';
       row.innerHTML=`<div><strong>${formatRange(item.period_start,item.period_end)}</strong><small>${shiftHours(list).toFixed(2)} h${has(list)?' • '+cash(total(list)):''} • ${periodLabel(work)}</small>${detail?`<small class="partial-detail">${detail}</small>`:''}</div><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div>`;
@@ -475,11 +539,17 @@ window.initPayPeriodUI=()=>{
       if(index<visiblePeriods){
         const paymentDetail=item.paid
           ?`Fully paid${item.paid_at?' · '+new Date(item.paid_at).toLocaleDateString():''}${+item.amount_received>0?' · '+cash(+item.amount_received)+' recorded':''}`
-          :+item.amount_received>0?`${cash(+item.amount_received)} received · ${progress.covered.toFixed(2)} h est. covered · ${progress.pending.toFixed(2)} h pending`:'No payment recorded';
+          :+item.amount_received>0?`${cash(+item.amount_received)} received · ${due==null?'Balance unavailable':cash(due)+' est. balance'} · ${progress.pending.toFixed(2)} h pending`:'No payment recorded';
         const tableRow=document.createElement('tr');
         tableRow.innerHTML=`<td data-label="Period">${index+1}</td><td data-label="Dates">${formatRange(item.period_start,item.period_end)}</td><td data-label="Worked hours">${shiftHours(list).toFixed(2)} h${detail?`<small class="partial-detail">${detail}</small>`:''}</td><td data-label="Estimated gross">${has(list)?cash(total(list)):'—'}</td><td data-label="Payment details">${paymentDetail}</td><td data-label="Status / share"><div class="period-row-controls">${statusButtons(item)}<button type="button" class="btn secondary period-share-action">↗ Share</button></div></td>`;
         bindChoices(tableRow);
         bindShare(tableRow);
+        if(!item.paid&&+item.amount_received>0){
+          const addPayment=document.createElement('button');addPayment.type='button';addPayment.className='btn secondary period-add-payment';
+          addPayment.textContent='Add payment / settle';
+          addPayment.onclick=()=>openPaymentChoice(item,list,work,true);
+          tableRow.querySelector('[data-label="Payment details"]').appendChild(addPayment);
+        }
         $('periodRows').appendChild(tableRow);
       }
     });

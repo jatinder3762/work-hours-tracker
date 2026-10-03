@@ -141,3 +141,21 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 @media(max-width:720px){#dashboardView .section-title .add-work{position:fixed;right:18px;bottom:82px;z-index:8;width:56px;height:56px;border-radius:18px;padding:0;font-size:0;display:grid;place-items:center;box-shadow:0 13px 28px rgba(41,98,232,.34)}#dashboardView .section-title .add-work span{font-size:27px}}
 @media(max-width:720px){.payments-page .payment-filter{display:grid;grid-template-columns:1fr}.payment-filter label{min-width:0}.payment-filter .btn{width:100%}.payments-page #periodHistory table{min-width:0}#periodRows td:nth-child(6){grid-column:1/-1}#periodRows td:nth-child(6) .period-row-controls{justify-content:flex-start}}
 @media(max-width:560px){#mobileNav .btn:first-child:not(.active){color:#60708b!important;background:transparent!important}#mobileNav .btn{font-size:12px;padding-inline:3px!important}}
+
+/* Previous pay periods stay separate from the current period. */
+.carryover-summary{margin:-2px 0 18px;border-color:#d9e6fb;background:#fbfdff}
+.carryover-summary .card-head{flex-wrap:wrap}
+.carryover-summary h2{font-size:21px}
+.carryover-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:18px 0}
+.carryover-totals>div{padding:14px;background:#edf4ff;border-radius:14px;min-width:0}
+.carryover-totals small,.carryover-totals strong{display:block}
+.carryover-totals small{font-size:12px;color:var(--muted)}
+.carryover-totals strong{font-size:20px;margin-top:6px;overflow-wrap:anywhere}
+.carryover-rows{display:grid;gap:8px}
+.carryover-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:13px;background:#fff}
+.carryover-row small{display:block;color:var(--muted);margin-top:4px;font-size:12px}
+.carryover-row .btn{flex:none}
+.carryover-note{font-size:12px;margin:14px 0 0;line-height:1.5}
+.payment-previous{margin:4px 0 12px}
+.period-add-payment{display:block;margin-top:9px;min-height:38px;font-size:12px}
+@media(max-width:720px){.carryover-totals{grid-template-columns:1fr 1fr}.carryover-totals>div:last-child{grid-column:1/-1}.carryover-row{align-items:stretch;flex-direction:column}.carryover-row .btn{width:100%}}
