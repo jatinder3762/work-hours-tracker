@@ -126,11 +126,11 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 @media(max-width:1000px){#workplaceView .workspace-grid{grid-template-columns:1fr}#workChartSlot{grid-column:1}#workplaceView .shift-entry-card{order:1}#workplaceView .calendar-card{order:2}}
 @media(max-width:720px){#workChartSlot{padding:18px 15px}#workplaceView .shift-entry-card .calendar-selection{align-items:flex-start}#workplaceView .shift-entry-card .calendar-selection p{width:auto}}
 
-/* Version 3.0: browse dates continuously and keep period actions with pay history. */
+/* Fixed month calendar with full current pay period and weekly earnings. */
 #workplaceView .stats{display:none}
-#calendar.calendar{display:block;max-height:620px;overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 10px 2px;scrollbar-gutter:stable}
+#calendar.calendar{display:block;padding:2px 0 10px;overflow:visible;max-height:none}
 #workplaceView .calendar-card>.calendar-head{display:none}
-.calendar-month{margin:16px 0 27px}
+.calendar-month{margin:16px 0 0}
 .calendar-month:first-child{margin-top:12px}
 .calendar-month h3{font-size:17px;margin:0 0 13px;letter-spacing:-.02em}
 .calendar-weekdays,.calendar-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
@@ -142,10 +142,15 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 #calendar .day.outside-month{opacity:.53}
 #calendar .day:disabled{cursor:default;opacity:.45}
 .calendar-week-total{text-align:right;padding:5px 2px 7px;color:#52647d;font-size:11px;font-weight:750;border-bottom:1px solid var(--line)}
-.calendar-earlier{display:block;margin:14px auto 2px}
+.calendar-period-context{font-size:12px;margin:0 0 14px;line-height:1.5}
+#calendar .day.outside-month.in-current-period{opacity:1}
+#calendar .day.outside-month b{font-size:11px}
+.calendar-card>.card-head{flex-wrap:wrap}
+.calendar-actions{flex-wrap:wrap}
+@media(max-width:560px){.calendar-card .calendar-actions{width:100%}.calendar-card .calendar-actions .btn{padding:9px 10px;min-height:44px}#calendar .day.outside-month b{font-size:10px}}
 .work-card-extra{border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:12px;line-height:1.45}
 .work-list .work-card-extra{grid-column:1/-1}
-@media(max-width:720px){#calendar.calendar{max-height:540px}#calendar .day{min-height:67px;padding:5px 3px}#calendar .day span{font-size:9px;margin-top:4px}#calendar .day small{font-size:9px}.calendar-weekdays,.calendar-week{gap:3px}.calendar-week-total{font-size:10px}}
+@media(max-width:720px){#calendar.calendar{max-height:none}#calendar .day{min-height:67px;padding:5px 3px}#calendar .day span{font-size:9px;margin-top:4px}#calendar .day small{font-size:9px}.calendar-weekdays,.calendar-week{gap:3px}.calendar-week-total{font-size:10px}}
 
 /* Payments has its own history page and workplace filter. */
 .payments-page .payment-filter{display:flex;align-items:end;gap:12px;margin-bottom:18px}
