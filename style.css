@@ -147,7 +147,7 @@ body.is-signed-out .app-shell,body.is-signed-out #mobileNav{display:none!importa
 #calendar .day.outside-month b{font-size:11px}
 .calendar-card>.card-head{flex-wrap:wrap}
 .calendar-actions{flex-wrap:wrap}
-@media(max-width:560px){.calendar-card .calendar-actions{width:100%}.calendar-card .calendar-actions .btn{padding:9px 10px;min-height:44px}#calendar .day.outside-month b{font-size:10px}}
+@media(max-width:560px){.calendar-card .calendar-actions{width:100%;display:grid;grid-template-columns:36px auto auto 36px;gap:5px}.calendar-card .calendar-actions .btn{padding:9px 5px;min-width:0;min-height:44px;font-size:12px;white-space:nowrap}#calendar .day.outside-month b{font-size:10px}}
 .work-card-extra{border-top:1px solid var(--line);padding-top:10px;color:var(--muted);font-size:12px;line-height:1.45}
 .work-list .work-card-extra{grid-column:1/-1}
 @media(max-width:720px){#calendar.calendar{max-height:none}#calendar .day{min-height:67px;padding:5px 3px}#calendar .day span{font-size:9px;margin-top:4px}#calendar .day small{font-size:9px}.calendar-weekdays,.calendar-week{gap:3px}.calendar-week-total{font-size:10px}}
