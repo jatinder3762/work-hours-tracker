@@ -129,7 +129,7 @@ window.initPayPeriodUI=()=>{
   calendarLegend.hidden=true;
   calendarLegend.setAttribute('aria-label','Pay period colours');
   calendarLegend.innerHTML='<span><i class="legend-paid" aria-hidden="true"></i>Paid</span><span><i class="legend-partial" aria-hidden="true"></i>Partially paid</span><span><i class="legend-current" aria-hidden="true"></i>Current period</span><small>Colours show pay periods, not worked shifts.</small>';
-  document.querySelector('.calendar-card .calendar-head').before(calendarLegend);
+  document.querySelector('.calendar-card #calendar').before(calendarLegend);
   const baseStatusCalendar=calendar;
   const calendarPayStatus=(date,rows,range,today)=>{
     const saved=rows.filter(item=>date>=item.period_start&&date<=item.period_end);
