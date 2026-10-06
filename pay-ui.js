@@ -267,7 +267,7 @@ window.initPayPeriodUI=()=>{
     summary=document.createElement('section');
     summary.id='paySummary';
     summary.className='card pay-summary';
-    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
+    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Earned (estimated)</small><strong id="periodEarned">—</strong></div><div><small>Received</small><strong id="periodReceived">—</strong></div><div><small>Remaining (est.)</small><strong id="periodRemaining">—</strong></div></div><p class="pay-summary-caption">Amounts belong to this pay period. Estimates use gross rates; paycheck deductions may change actual pay.</p><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
     document.querySelector('#workplaceView .workspace-grid')?.insertAdjacentElement('afterend',summary);
     const carryover=document.createElement('section');
     carryover.id='carryoverSummary';carryover.className='card carryover-summary';carryover.hidden=true;
@@ -323,6 +323,8 @@ window.initPayPeriodUI=()=>{
     const requestId=++summaryRequest;
     ensureSummary();
     $('carryoverSummary').hidden=true;
+    ['periodEarned','periodReceived','periodRemaining'].forEach(id=>$(id).textContent='—');
+    $('paySummaryState').textContent='Loading payment status…';
     const workplaceId=current.id;
     const range=period(current);
     const all=ws(workplaceId);
@@ -391,6 +393,11 @@ window.initPayPeriodUI=()=>{
       $('paidHoursTotal').textContent=(shiftHours(paidList)+partialHours).toFixed(2)+' h';
       $('paidEarningsTotal').textContent=has(paidList)?cash(total(paidList)):'—';
       currentPeriodRecord=periods.find(item=>item.period_start===range.start&&item.period_end===range.end)||null;
+      $('periodEarned').textContent=has(currentList)?cash(total(currentList)):currentList.length?'Rate needed':cash(0);
+      $('periodReceived').textContent=cash(+currentPeriodRecord?.amount_received||0);
+      $('periodRemaining').textContent=currentPending==null?(currentList.length?'Rate needed':cash(0)):cash(currentPending);
+      $('paySummaryState').textContent=currentList.length?'':'No shifts recorded in this pay period.';
+      window.refreshShiftEditor?.();
       const currentCovered=currentPeriodRecord?.paid?shiftHours(currentList):partialProgress(currentList,currentPeriodRecord?.amount_received).covered;
       $('pendingHoursTotal').textContent=Math.max(0,shiftHours(currentList)-currentCovered).toFixed(2)+' h';
       const isPaid=!!currentPeriodRecord?.paid;
@@ -401,8 +408,8 @@ window.initPayPeriodUI=()=>{
       action.textContent=isPaid?'View Paid Period':+currentPeriodRecord?.amount_received>0?'Manage payment':'Record payment';
       action.className='btn '+(isPaid?'secondary':'primary');
       action.dataset.paid=String(isPaid);
-    }catch(error){if(requestId===summaryRequest){calendarStatusLoaded=false;paintCalendarStatus();msg(error.message||'Unable to load pay status.',true)}}
-    finally{if(current?.id===workplaceId&&requestId===summaryRequest){currentAction.disabled=false;currentAction.classList.remove('is-loading')}}
+    }catch(error){if(requestId===summaryRequest){calendarStatusLoaded=false;paintCalendarStatus();$('paySummaryState').textContent='Unable to load payment status. Open pay history to retry.';msg(error.message||'Unable to load pay status.',true)}}
+    finally{if(current?.id===workplaceId&&requestId===summaryRequest){currentAction.disabled=!currentList.length||!calendarStatusLoaded;currentAction.classList.remove('is-loading')}}
   };
 
   async function markCurrentPaid(){
@@ -434,12 +441,13 @@ window.initPayPeriodUI=()=>{
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
+  history.hidden=true;
   history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Pay periods</h2></div></div><div id="historyContent"><p class="muted">The calendar shows weekly totals. Record Paid, Partial, or Unpaid for each original pay period below. Only fully paid periods lock shifts; unlocking requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
   document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
   let visiblePeriods=12;
   $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
   $('payBtn').textContent='Pay periods';
-  $('payBtn').onclick=()=>{$('periodHistory').scrollIntoView({behavior:'smooth',block:'start'})};
+  $('payBtn').onclick=()=>{$('periodHistory').hidden=false;$('periodHistory').scrollIntoView({behavior:'smooth',block:'start'})};
 
   let payRequest=0;
   renderPay=async function(){
