@@ -5,12 +5,6 @@ window.initShiftUI=()=>{
   const editor=$('shiftEditor'), action=$('shiftAction'), summary=$('selectedShiftSummary'), choices=$('shiftChoices');
   action.hidden=true;
   editor.hidden=false;
-  const addAnother=document.createElement('button');
-  addAnother.type='button';
-  addAnother.className='btn secondary';
-  addAnother.textContent='＋ Add another shift';
-  addAnother.hidden=true;
-  editor.querySelector('.card-head').appendChild(addAnother);
   let actionRequest=0;
   const displayDate=date=>dt(date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
   const selectedShifts=()=>current&&selected?shifts.filter(shift=>shift.workplaceId===current.id&&shift.date===selected):[];
@@ -56,7 +50,6 @@ window.initShiftUI=()=>{
     updateSummary();
     choices.hidden=true;
     choices.replaceChildren();
-    addAnother.hidden=true;
     displayShift(null);
     if(!workplaceId||!date)return;
     const invalidDate=dateError(date);
@@ -79,7 +72,6 @@ window.initShiftUI=()=>{
           choices.appendChild(button);
         });
       }
-      addAnother.hidden=locked||!matches.length;
       displayShift(matches[0],locked);
       if(locked&&!matches.length)msg('This date is in a paid period. Unlock the period before adding a shift.',true);
     }catch(error){
@@ -89,7 +81,6 @@ window.initShiftUI=()=>{
       msg(error.message||'Unable to check the pay period. Try selecting the date again.',true);
     }
   };
-  addAnother.onclick=()=>displayShift(null);
   $('cancelEdit').onclick=()=>updateEditor();
 
   const startDate=()=>current?.pay_anchor_date||'';
