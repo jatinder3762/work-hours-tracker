@@ -1,0 +1,35 @@
+/* Shared palette for the app, authentication and information pages. */
+:root {
+  --brand:#087e91;
+  --brand-hover:#066979;
+  --brand-aqua:#35b6c6;
+  --brand-soft:#e5f5f8;
+  --brand-ring:#55a8b9;
+  --page-bg:#f0f8fb;
+  --surface:#ffffff;
+  --ink:#173746;
+  --muted:#587582;
+  --line:#cbdfe6;
+  --success:#227053;
+  --success-soft:#eaf7ef;
+  --success-line:#9bceaf;
+  --warning:#876012;
+  --warning-soft:#fff5dd;
+  --warning-line:#dfc681;
+  --danger:#b22d41;
+  --danger-soft:#fff0f2;
+  --danger-line:#e6b4bf;
+  --overlay:rgba(23,55,70,.48);
+  --blue:var(--brand);
+  --blue2:var(--brand-aqua);
+  --aqua:var(--brand-aqua);
+  --accent:var(--brand-aqua);
+  --green:var(--success);
+  --amber:var(--warning);
+  --red:var(--danger);
+  --bg:var(--page-bg);
+  --soft:var(--brand-soft);
+  --white:var(--surface);
+  --shadow:0 14px 38px rgba(23,55,70,.09);
+  --radius:22px;
+}
