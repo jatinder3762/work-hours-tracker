@@ -1,0 +1,47 @@
+/* Common form structure. Loaded after page-specific styles. */
+:is(#app,.modal) .form{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:none;margin:0}
+:is(#app,.modal) .form label{display:block;min-width:0;margin:0;color:var(--ink);font-size:13px;font-weight:500;line-height:1.5}
+:is(#app,.modal) .form label>input:not([type="hidden"]),
+:is(#app,.modal) .form label>select{display:block;box-sizing:border-box;width:100%;min-width:0;height:48px;min-height:48px;margin:8px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font-size:16px;line-height:1.4}
+:is(#app,.modal) .form label>input[readonly],:is(#app,.modal) .form label>input:disabled,:is(#app,.modal) .form label>select:disabled{background:var(--page-bg);color:var(--muted);opacity:1}
+:is(#app,.modal) .form label>input[aria-invalid="true"],:is(#app,.modal) .form label>select[aria-invalid="true"]{border-color:var(--danger)}
+:is(#app,.modal) .form label>small{margin:6px 0 0;font-size:12px;font-weight:400;line-height:1.5;color:var(--muted)}
+:is(#app,.modal) .form label>small.field-error{color:var(--danger)}
+:is(#app,.modal) .form .two,:is(#app,.modal) .profile-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+:is(#app,.modal) .modal-actions,.shift-form-actions,.profile-form-actions{display:flex;justify-content:flex-end;align-items:stretch;gap:12px;position:static;margin:8px 0 0;padding:16px 0 0;border-top:1px solid var(--line);background:transparent;box-shadow:none}
+:is(#app,.modal) .modal-actions .btn,.shift-form-actions .btn,.profile-form-actions .btn{min-width:140px;width:auto;min-height:48px;margin:0;padding:12px 16px;border-radius:8px;font-size:14px;line-height:1.4}
+.shift-form-actions .btn,.modal-actions:has(.btn.primary)>.btn{flex:1}
+.modal-actions:has(.btn.warning)>.btn.warning{flex:0 1 auto}
+.modal .modal-card,.auth-modal .auth-card{padding:24px;border-radius:14px;background:var(--surface)}
+.modal :is(h1,h2){font-size:24px;line-height:1.25;margin:8px 0 16px}
+.modal .form>p,.modal .form-note{margin:0;line-height:1.5}
+.auth-form>.btn.primary{min-height:48px;margin:8px 0 0;border-radius:8px}
+.auth-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}
+.auth-actions .text-btn{min-height:48px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;color:var(--brand);background:var(--surface);font-size:14px}
+#workModal .modal-card{padding:24px}
+#workModal .form{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#workModal .modal-actions{margin:8px 0 0;padding:16px 0 0;position:static}
+#workModal .form>label:first-of-type,#workModal #rateHistoryBox,#workModal .modal-actions{grid-column:1/-1}
+.profile-card{padding:24px}
+.profile-card .profile-fields{gap:16px}
+.form :is(.auth-error,.form-note,.profile-message){grid-column:1/-1}
+/* Quiet white surfaces and solid blue accents. */
+body,.info-site,.splash{background:var(--page-bg)}
+.brand-symbol,.welcome-logo,.profile-avatar,.month-bar,.daily-bar,.splash-bars i{background:var(--brand)}
+.welcome-preview,.profile-hero,.welcome-steps{background:var(--surface)}
+.welcome-copy h1 span{background:none;color:var(--brand);-webkit-text-fill-color:var(--brand)}
+.period-card{background:var(--brand)}
+:is(#app,.modal) .btn{border-radius:8px}
+:is(#app,.modal) .btn.primary{border:1px solid var(--brand)}
+:is(#app,.modal) .form .btn:not(:disabled):hover,:is(#app,.modal) .modal-actions .btn:not(:disabled):hover{transform:none}
+@media(max-width:720px){
+  .modal .modal-card,.auth-modal .auth-card,#workModal .modal-card,.profile-card{padding:20px}
+  #workModal .form,:is(#app,.modal) .profile-fields,:is(#app,.modal) .form .two{grid-template-columns:minmax(0,1fr)}
+  #shiftForm .two:not(.shift-rate-row){grid-template-columns:repeat(2,minmax(0,1fr))}
+  :is(#app,.modal) .modal-actions,.shift-form-actions,.profile-form-actions{gap:12px;margin-top:8px;padding-top:16px}
+  :is(#app,.modal) .modal-actions .btn,.shift-form-actions .btn,.profile-form-actions .btn{min-width:0;flex:1}
+  #workModal .modal-actions .btn.warning{flex-basis:100%}
+  #workModal .modal-actions{flex-wrap:wrap}
+  .profile-form-actions .btn{width:100%}
+  .auth-actions{grid-template-columns:1fr}
+}
