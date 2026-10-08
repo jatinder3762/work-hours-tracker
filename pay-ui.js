@@ -168,7 +168,16 @@ window.initPayPeriodUI=()=>{
   choiceModal.hidden=true;
   choiceModal.innerHTML='<div class="card modal-card payment-choice-card"><p class="eyebrow">RECORD PAYMENT</p><h2 id="choiceDates">Pay period</h2><p class="muted">Choose how much of this period has been paid.</p><div class="payment-choices"><button type="button" id="chooseFullPayment" class="btn primary">Fully paid</button><button type="button" id="choosePartialPayment" class="btn secondary">Partially paid</button></div><p id="previousReceipt" class="muted payment-previous"></p><form id="partialPaymentForm" class="form" hidden><label>Additional payment received now (CAD)<input id="partialAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></label><p id="partialEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Hours are estimated from recorded gross rates. Paycheck deductions can change the amount received. Partial payment keeps the period open. Enter only the new payment, not the earlier total.</p><button id="savePartialPayment" class="btn primary wide">Record partial payment</button></form><form id="fullPaymentForm" class="form" hidden><label>Additional payment received now (CAD) <span>(optional)</span><input id="fullAdditionalAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0.00"></label><p id="fullPaymentEstimate" class="partial-estimate muted"></p><p class="muted payment-disclaimer">Confirm fully paid only when all hours for this original period are settled. This locks its shifts. The amount is recorded with this period, not the current week.</p><button id="confirmFullPayment" class="btn primary wide">Confirm fully paid</button></form><p id="paymentChoiceError" class="auth-error" role="alert" hidden></p><div class="modal-actions"><button type="button" id="cancelPaymentChoice" class="btn secondary">Cancel</button></div></div>';
   document.body.appendChild(choiceModal);
-  const closeChoice=()=>{choiceModal.hidden=true;choiceContext=null;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=true;$('paymentChoiceError').hidden=true};
+  const paymentActions=choiceModal.querySelector('.modal-actions');
+  for(const [id,formId] of [['savePartialPayment','partialPaymentForm'],['confirmFullPayment','fullPaymentForm']]){
+    const button=$(id);button.type='submit';button.setAttribute('form',formId);button.hidden=true;paymentActions.appendChild(button);
+  }
+  const syncPaymentActions=()=>{
+    $('savePartialPayment').hidden=$('partialPaymentForm').hidden;
+    $('confirmFullPayment').hidden=$('fullPaymentForm').hidden;
+  };
+
+  const closeChoice=()=>{choiceModal.hidden=true;choiceContext=null;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=true;$('paymentChoiceError').hidden=true;syncPaymentActions()};
   $('cancelPaymentChoice').onclick=closeChoice;
   choiceModal.onclick=event=>{if(event.target===choiceModal)closeChoice()};
   const choiceError=message=>{$('paymentChoiceError').textContent=message;$('paymentChoiceError').hidden=false};
@@ -192,6 +201,7 @@ window.initPayPeriodUI=()=>{
     $('previousReceipt').textContent=+item.amount_received>0?`Previously recorded: ${cash(+item.amount_received)}. New payments will be added to this period.`:'No payment recorded for this period yet.';
     $('partialAmount').value='';$('fullAdditionalAmount').value='';
     $('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=true;$('paymentChoiceError').hidden=true;
+    syncPaymentActions();
     choiceModal.hidden=false;
     if(showPartial)$('choosePartialPayment').click();
   };
@@ -217,7 +227,7 @@ window.initPayPeriodUI=()=>{
     try{
       const {error}=await sb.from('pay_periods').select('amount_received').limit(1);
       if(error){choiceError('Partial payments need the new Supabase database migration before they can be saved.');return}
-      $('paymentChoiceError').hidden=true;$('fullPaymentForm').hidden=true;$('partialPaymentForm').hidden=false;updatePartialEstimate();
+      $('paymentChoiceError').hidden=true;$('fullPaymentForm').hidden=true;$('partialPaymentForm').hidden=false;syncPaymentActions();updatePartialEstimate();
       $('partialAmount').focus();
     }catch(error){choiceError(error.message||'Unable to check partial payments.')}
     finally{this.disabled=false;this.classList.remove('is-loading')}
@@ -226,7 +236,7 @@ window.initPayPeriodUI=()=>{
     if(!choiceContext)return;
     const {item,list,work}=choiceContext;
     if(!list.length){choiceError('Add at least one shift before marking this period fully paid.');return}
-    $('paymentChoiceError').hidden=true;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=false;
+    $('paymentChoiceError').hidden=true;$('partialPaymentForm').hidden=true;$('fullPaymentForm').hidden=false;syncPaymentActions();
     $('fullAdditionalAmount').oninput();$('fullAdditionalAmount').focus();
   };
   $('fullPaymentForm').onsubmit=async event=>{

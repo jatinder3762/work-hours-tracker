@@ -1,15 +1,15 @@
 /* Shared palette for the app, authentication and information pages. */
 :root {
-  --brand:#087e91;
-  --brand-hover:#066979;
-  --brand-aqua:#35b6c6;
-  --brand-soft:#e5f5f8;
-  --brand-ring:#55a8b9;
-  --page-bg:#f0f8fb;
+  --brand:#2563eb;
+  --brand-hover:#1d4ed8;
+  --brand-aqua:#2563eb;
+  --brand-soft:#eff6ff;
+  --brand-ring:#60a5fa;
+  --page-bg:#f8fafc;
   --surface:#ffffff;
-  --ink:#173746;
-  --muted:#587582;
-  --line:#cbdfe6;
+  --ink:#1f2937;
+  --muted:#6b7280;
+  --line:#d1d5db;
   --success:#227053;
   --success-soft:#eaf7ef;
   --success-line:#9bceaf;
@@ -19,7 +19,7 @@
   --danger:#b22d41;
   --danger-soft:#fff0f2;
   --danger-line:#e6b4bf;
-  --overlay:rgba(23,55,70,.48);
+  --overlay:rgba(31,41,55,.48);
   --blue:var(--brand);
   --blue2:var(--brand-aqua);
   --aqua:var(--brand-aqua);
@@ -30,6 +30,6 @@
   --bg:var(--page-bg);
   --soft:var(--brand-soft);
   --white:var(--surface);
-  --shadow:0 14px 38px rgba(23,55,70,.09);
-  --radius:22px;
+  --shadow:0 14px 38px rgba(31,41,55,.09);
+  --radius:14px;
 }
