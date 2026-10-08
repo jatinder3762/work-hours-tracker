@@ -1,11 +1,10 @@
 /* Phase 4: shared controls and connected, mobile-first work entry. */
-#app { --line:#d6e6eb; --soft:#f0f8fb; --blue:#087e91; --aqua:#35b6c6; }
 #app .btn, .modal .btn { min-height:48px; padding:12px 16px; border-radius:10px; font-size:14px; line-height:1.3; display:inline-flex; justify-content:center; align-items:center; gap:8px; }
-#app .btn.primary, .modal .btn.primary { background:#087e91; color:#fff; box-shadow:none; }
-#app .btn.secondary, .modal .btn.secondary { background:#fff; color:#254957; border:1px solid #cbdfe6; box-shadow:none; }
+#app .btn.primary, .modal .btn.primary { background:var(--brand); color:var(--surface); box-shadow:none; }
+#app .btn.secondary, .modal .btn.secondary { background:var(--surface); color:var(--ink); border:1px solid var(--line); box-shadow:none; }
 #app .btn:disabled:not(.is-loading), .modal .btn:disabled:not(.is-loading) { cursor:default; opacity:.5; }
-#app input,#app select,.modal input,.modal select { min-height:48px; border-radius:10px; border:1px solid #cbdfe6; font-size:16px; padding:10px 12px; min-width:0; width:100%; }
-#app input[readonly] { background:#f0f6f8; color:#466574; }
+#app input,#app select,.modal input,.modal select { min-height:48px; border-radius:10px; border:1px solid var(--line); font-size:16px; padding:10px 12px; min-width:0; width:100%; }
+#app input[readonly] { background:var(--brand-soft); color:var(--muted); }
 #app .card { border-radius:14px; border-color:var(--line); box-shadow:none; }
 #app .form label,.modal .form label { display:block; min-width:0; font-size:13px; line-height:1.4; }
 #app .form label>input,#app .form label>select,.modal .form label>input,.modal .form label>select { margin-top:7px; }
@@ -16,7 +15,7 @@
 #workplaceView .work-entry-surface { padding:0; overflow:hidden; }
 .work-entry-layout { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); }
 #workplaceView .calendar-card { grid-column:1; grid-row:1; padding:24px; border-right:1px solid var(--line); }
-#workplaceView .shift-entry-card { grid-column:2; grid-row:1; padding:24px; background:#fcfeff; }
+#workplaceView .shift-entry-card { grid-column:2; grid-row:1; padding:24px; background:var(--surface); }
 #workplaceView .shift-entry-card .calendar-selection { margin:0 0 20px; padding:0 0 16px; }
 #workplaceView .shift-entry-card .calendar-selection p { font-size:13px; line-height:1.6; }
 #workplaceView .shift-entry-card .shift-editor { padding:0; }
@@ -29,9 +28,9 @@
 .shift-estimate small,.shift-estimate strong { display:block; }
 .shift-estimate small { font-size:12px; color:var(--muted); }
 .shift-estimate strong { font-size:20px; margin-top:6px; font-variant-numeric:tabular-nums; }
-.field-error { display:block; color:#b22d41; font-size:12px; margin-top:5px; }
+.field-error { display:block; color:var(--danger); font-size:12px; margin-top:5px; }
 .field-error:empty { display:none; }
-#app [aria-invalid="true"] { border-color:#b22d41; }
+#app [aria-invalid="true"] { border-color:var(--danger); }
 .form-note { min-height:20px; font-size:13px; margin-top:12px; line-height:1.5; background:transparent; padding:0; }
 .form-note:empty { min-height:0; margin:0; }
 #app .form-note:not(:empty) { padding:0; background:transparent; border-radius:0; }
@@ -39,7 +38,7 @@
 #calendar .day small { display:none; }
 #calendar .day { min-height:64px; text-align:center; padding:8px 3px; border-radius:8px; }
 #calendar .day span { font-size:11px; }
-#calendar .day.selected { outline:2px solid #087e91; outline-offset:1px; box-shadow:none; }
+#calendar .day.selected { outline:2px solid var(--brand); outline-offset:1px; box-shadow:none; }
 .calendar-week-total { font-size:12px; line-height:1.5; padding:9px 0 12px; }
 .calendar-weekdays { font-size:11px; }
 .calendar-pay-legend { font-size:12px; }
