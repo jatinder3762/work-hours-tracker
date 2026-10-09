@@ -512,7 +512,20 @@ window.initPayPeriodUI=()=>{
       };
       const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.status)}});
       bindChoices(row);
-      const bindShare=container=>{container.querySelector('.period-share-action').onclick=function(){sharePeriod({work,range:item,shifts:list,button:this})}};
+      const bindShare=container=>{container.querySelector('.period-share-action').onclick=function(){
+        sharePeriod({work,range:item,shifts:list,button:this,loadDetails:async()=>{
+          const {data:saved,error:shareError}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',workplaceId);
+          if(shareError)throw Error('Unable to check pending payments. Please try sharing again.');
+          const fresh=buildPeriodHistory(work,ws(workplaceId).map(shift=>shift.date),saved||[],period(work));
+          const range=fresh.find(row=>row.period_start===item.period_start&&row.period_end===item.period_end);
+          if(!range)throw Error('This pay period changed. Refresh the pay history before sharing.');
+          const earlier=fresh.filter(row=>!row.paid&&row.period_end<range.period_start)
+            .map(row=>{const entries=periodShifts(work,{start:row.period_start,end:row.period_end});return {...row,pending:outstanding(entries,row),hasShifts:entries.length>0}})
+            .filter(row=>row.hasShifts&&(row.pending==null||row.pending>0))
+            .sort((a,b)=>a.period_start.localeCompare(b.period_start));
+          return {range,shifts:periodShifts(work,{start:range.period_start,end:range.period_end}),earlier};
+        }});
+      }};
       bindShare(row);
       if(index<24)$('payPeriods').appendChild(row);
       if(index<visiblePeriods){
