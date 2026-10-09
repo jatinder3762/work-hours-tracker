@@ -83,7 +83,7 @@ window.initShiftUI=()=>{
       $('breakMin').value=shift.breakMin;
       $('formTitle').textContent=locked?'View paid shift':'Edit shift';
       saveButton.textContent='Save changes';
-      msg(locked?'This shift is in a paid period. Unlock the period to edit it.':shift.rate==null?'Rate not assigned.':'Recorded rate: '+cash(shift.rate)+'/h');
+      msg(locked?'This shift is in a paid period. Unlock the period to edit it.':shift.rate==null?'Rate not assigned.':'');
     }else{
       $('date').value=selected||'';
       $('formTitle').textContent=selected?`Add shift · ${displayDate(selected)}`:'Select a date to add a shift';
