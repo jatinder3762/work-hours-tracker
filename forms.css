@@ -45,3 +45,25 @@ body,.info-site,.splash{background:var(--page-bg)}
   .profile-form-actions .btn{width:100%}
   .auth-actions{grid-template-columns:1fr}
 }
+
+/* Keep native date/time controls inside their grid cells on iOS. */
+:is(#app,.modal) .form label>input:is([type="date"],[type="time"]){-webkit-appearance:none;appearance:none;max-width:100%;min-inline-size:0;max-inline-size:100%;line-height:normal;overflow:hidden}
+:is(#app,.modal) .form input:is([type="date"],[type="time"])::-webkit-date-and-time-value{min-width:0;margin:0;text-align:left}
+:is(#app,.modal) .form input:is([type="date"],[type="time"])::-webkit-datetime-edit{min-width:0;padding:0}
+#workplaceView .shift-entry-card,#workplaceView .shift-entry-card .shift-editor{min-width:0}
+#workplaceView .shift-entry-card .form{grid-template-columns:minmax(0,1fr);min-width:0}
+#shiftForm .two{min-width:0;gap:16px}
+#shiftForm .shift-estimate{border-bottom:0;padding-bottom:0}
+#shiftForm .shift-form-actions{margin-top:0;padding-top:16px}
+
+/* Filters use the same control dimensions as data-entry forms. */
+#app .toolbar select{box-sizing:border-box;height:48px;min-height:48px;max-width:100%;min-width:0;border-radius:8px;font-size:16px;background:var(--surface);color:var(--ink)}
+#app .search-box{height:48px;min-width:0;border-radius:8px}
+#app .search-box input{height:46px;min-height:0;min-width:0;border:0;padding:0;background:transparent}
+#reportsView .report-filters,#reportsView .toolbar-right{min-width:0}
+#reportsView .toolbar-right{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.5fr);gap:16px}
+#reportsView .toolbar-right select{width:100%}
+@media(max-width:720px){
+  #reportsView .report-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
+  #reportsView .toolbar-right{width:100%;grid-template-columns:minmax(0,1fr)}
+}
