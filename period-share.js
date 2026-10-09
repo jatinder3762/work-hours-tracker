@@ -25,7 +25,7 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     finally{this.disabled=false;this.classList.remove('is-loading')}
   };
 
-  const makeImage=async(work,range,shifts)=>{
+  const makeImage=async(work,range,shifts,earlier=[])=>{
     const theme=getComputedStyle(document.documentElement);
     const color=token=>theme.getPropertyValue('--'+token).trim();
     const grouped=new Map();
@@ -35,7 +35,17 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     });
     const days=[...grouped.entries()];
     const rowCount=Math.max(1,days.length);
-    const width=760,height=630+rowCount*72;
+    const amount=list=>list.every(shift=>shift.rate!=null&&Number.isFinite(+shift.rate))
+      ?Math.round(list.reduce((sum,shift)=>sum+h(shift)*+shift.rate,0)*100)/100:null;
+    const earnings=amount(shifts),received=Math.max(0,+range.amount_received||0);
+    const pending=range.paid?0:earnings==null?null:Math.max(0,Math.round((earnings-received)*100)/100);
+    const earlierPending=earlier.some(item=>item.pending==null)?null:Math.round(earlier.reduce((sum,item)=>sum+item.pending,0)*100)/100;
+    const combined=pending==null||earlierPending==null?null:Math.round((pending+earlierPending)*100)/100;
+    const money=value=>value==null?'Unavailable':new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD',currencyDisplay:'code'}).format(value).replace('CAD','CA$');
+    const priorHeight=100+earlier.length*54;
+    const currentTop=(earlier.length?364+priorHeight:344)+39;
+    const dailyTop=currentTop+239,footerY=dailyTop+49+rowCount*45;
+    const width=760,height=footerY+55;
     const canvas=document.createElement('canvas');
     canvas.width=width*2;canvas.height=height*2;
     const ctx=canvas.getContext('2d');
@@ -69,50 +79,55 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     write(work.name,140,137,'bold 29px Arial, sans-serif',color('surface'),535);
     write('Personal work log',140,171,'17px Arial, sans-serif',color('line'));
 
-    write('SELECTED PERIOD',64,244,'bold 15px Arial, sans-serif',color('muted'));
-    write(formatRange(range.period_start,range.period_end),64,287,'bold 29px Arial, sans-serif',color('ink'),615);
-    const partial=!range.paid&&+range.amount_received>0;
-    rounded(64,307,range.paid?74:91,30,15,range.paid?color('success-soft'):partial?color('warning-soft'):color('page-bg'));
-    write(range.paid?'PAID':partial?'PARTIAL':'UNPAID',78,328,'bold 13px Arial, sans-serif',range.paid?color('success'):partial?color('warning'):color('muted'));
+    rounded(64,228,632,116,17,color('brand'));
+    write('TOTAL PENDING',82,260,'bold 15px Arial, sans-serif',color('surface'));
+    write(money(combined),82,315,'bold 42px Arial, sans-serif',color('surface'),350);
+    ctx.textAlign='right';write('Current + earlier periods',678,314,'15px Arial, sans-serif',color('surface'));ctx.textAlign='left';
 
-    rounded(64,361,298,107,17,color('brand-soft'));
-    rounded(378,361,318,107,17,color('brand-soft'));
-    write('WORKED HOURS',82,392,'bold 14px Arial, sans-serif',color('muted'));
-    write(hours.toFixed(2)+' h',82,445,'bold 39px Arial, sans-serif',color('ink'));
-    write('SHIFTS LOGGED',397,392,'bold 14px Arial, sans-serif',color('muted'));
-    write(String(shifts.length),397,445,'bold 39px Arial, sans-serif',color('ink'));
-
-    write('DAILY WORK',64,514,'bold 15px Arial, sans-serif',color('brand'));
-    ctx.fillStyle=color('line');ctx.fillRect(64,531,632,1);
-    if(!days.length){write('No shifts logged for this period',64,577,'19px Arial, sans-serif',color('muted'))}
-    days.forEach(([date,list],index)=>{
-      const y=553+index*72;
-      const dayHours=list.reduce((sum,shift)=>sum+h(shift),0);
-      const parts=list.map(shift=>shift.start+'–'+shift.end).join('  ·  ');
-      write(dt(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}),64,y+13,'bold 18px Arial, sans-serif',color('ink'),345);
-      write(parts,64,y+39,'15px Arial, sans-serif',color('muted'),495);
-      ctx.textAlign='right';
-      write(dayHours.toFixed(2)+' h',696,y+26,'bold 22px Arial, sans-serif',color('ink'));
-      ctx.textAlign='left';
-      ctx.fillStyle=color('line');ctx.fillRect(64,y+57,632,1);
-    });
-    const footerY=553+rowCount*72;
-    write('Personal work log. Hours exclude unpaid breaks.',64,footerY+12,'14px Arial, sans-serif',color('muted'));
-    if(partial&&shifts.every(shift=>shift.rate>0)){
-      const estimate=shifts.reduce((sum,shift)=>sum+h(shift)*shift.rate,0);
-      const covered=estimate>0?Math.min(hours,hours*+range.amount_received/estimate):0;
-      write(`Estimated paid ${covered.toFixed(2)} h  ·  Pending ${Math.max(0,hours-covered).toFixed(2)} h`,64,footerY+35,'13px Arial, sans-serif',color('brand'));
+    if(earlier.length){
+      rounded(64,364,632,priorHeight,17,color('warning-soft'));
+      write('PENDING BALANCE · EARLIER PERIODS',82,397,'bold 14px Arial, sans-serif',color('warning'));
+      write(money(earlierPending),82,444,'bold 34px Arial, sans-serif',color('ink'),590);
+      earlier.forEach((item,index)=>{
+        const y=482+index*54;
+        write(formatRange(item.period_start,item.period_end),82,y,'17px Arial, sans-serif',color('ink'),405);
+        write(+item.amount_received>0?'Partially paid':'Unpaid',82,y+23,'13px Arial, sans-serif',color('muted'));
+        ctx.textAlign='right';write(money(item.pending),678,y+10,'bold 20px Arial, sans-serif',color('ink'),165);ctx.textAlign='left';
+      });
     }
+
+    write('CURRENT PERIOD',64,currentTop,'bold 15px Arial, sans-serif',color('brand'));
+    write(formatRange(range.period_start,range.period_end),64,currentTop+39,'bold 27px Arial, sans-serif',color('ink'),632);
+    rounded(64,currentTop+61,308,100,17,color('brand-soft'));
+    rounded(388,currentTop+61,308,100,17,color('brand-soft'));
+    write('TOTAL HOURS',82,currentTop+89,'bold 13px Arial, sans-serif',color('muted'));
+    write(hours.toFixed(2)+' h',82,currentTop+136,'bold 35px Arial, sans-serif',color('ink'),270);
+    write('TOTAL EARNINGS',406,currentTop+89,'bold 13px Arial, sans-serif',color('muted'));
+    write(money(earnings),406,currentTop+136,'bold 32px Arial, sans-serif',color('ink'),270);
+    write(range.paid?'Fully paid':'Received '+money(received),64,currentTop+196,'16px Arial, sans-serif',color('muted'),300);
+    ctx.textAlign='right';write('Pending '+money(pending),696,currentTop+196,'bold 16px Arial, sans-serif',color('ink'),315);ctx.textAlign='left';
+
+    write('WORK DETAILS',64,dailyTop,'bold 14px Arial, sans-serif',color('brand'));
+    ctx.fillStyle=color('line');ctx.fillRect(64,dailyTop+16,632,1);
+    if(!days.length)write('No shifts logged for this period',64,dailyTop+49,'17px Arial, sans-serif',color('muted'));
+    days.forEach(([date,list],index)=>{
+      const y=dailyTop+49+index*45;
+      write(dt(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}),64,y,'17px Arial, sans-serif',color('ink'),470);
+      ctx.textAlign='right';write(list.reduce((sum,shift)=>sum+h(shift),0).toFixed(2)+' h',696,y,'bold 18px Arial, sans-serif',color('ink'));ctx.textAlign='left';
+      ctx.fillStyle=color('line');ctx.fillRect(64,y+16,632,1);
+    });
+    write('Amounts are estimates · As of '+new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}),64,footerY,'13px Arial, sans-serif',color('muted'),632);
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Could not create the report image.')),'image/png'));
     const filename=`my-tracker-${range.period_start}-to-${range.period_end}.png`;
     return new File([blob],filename,{type:'image/png'});
   };
 
-  return async({work,range,shifts,button})=>{
+  return async({work,range,shifts,button,loadDetails})=>{
     if(button.disabled)return;
     button.disabled=true;button.classList.add('is-loading');
     try{
-      const file=await makeImage(work,range,shifts);
+      const details=loadDetails?await loadDetails():{range,shifts,earlier:[]};
+      const file=await makeImage(work,details.range,details.shifts,details.earlier);
       close();
       imageFile=file;imageUrl=URL.createObjectURL(file);
       $('periodSharePreview').src=imageUrl;
