@@ -71,18 +71,18 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     ctx.fillStyle=color('brand-soft');ctx.fillRect(0,0,width,height);
     rounded(28,26,width-56,height-52,28,color('surface'));
     const gradient=ctx.createLinearGradient(48,48,712,195);
-    gradient.addColorStop(0,color('brand'));gradient.addColorStop(1,color('brand'));
+    gradient.addColorStop(0,color('hero'));gradient.addColorStop(1,color('hero'));
     rounded(48,46,width-96,158,21,gradient);
     rounded(72,72,50,50,14,color('surface'));
     write('M',84,109,'bold 31px Arial, sans-serif',color('brand'));
-    write('MY TRACKER  /  WORK PERIOD',140,90,'bold 16px Arial, sans-serif',color('line'));
-    write(work.name,140,137,'bold 29px Arial, sans-serif',color('surface'),535);
-    write('Personal work log',140,171,'17px Arial, sans-serif',color('line'));
+    write('MY TRACKER  /  WORK PERIOD',140,90,'bold 16px Arial, sans-serif',color('muted'));
+    write(work.name,140,137,'bold 29px Arial, sans-serif',color('hero-ink'),535);
+    write('Personal work log',140,171,'17px Arial, sans-serif',color('muted'));
 
-    rounded(64,228,632,116,17,color('brand'));
-    write('TOTAL PENDING',82,260,'bold 15px Arial, sans-serif',color('surface'));
-    write(money(combined),82,315,'bold 42px Arial, sans-serif',color('surface'),350);
-    ctx.textAlign='right';write('Current + earlier periods',678,314,'15px Arial, sans-serif',color('surface'));ctx.textAlign='left';
+    rounded(64,228,632,116,17,color('hero'));
+    write('TOTAL PENDING',82,260,'bold 15px Arial, sans-serif',color('hero-ink'));
+    write(money(combined),82,315,'bold 42px Arial, sans-serif',color('hero-ink'),350);
+    ctx.textAlign='right';write('Current + earlier periods',678,314,'15px Arial, sans-serif',color('hero-ink'));ctx.textAlign='left';
 
     if(earlier.length){
       rounded(64,364,632,priorHeight,17,color('warning-soft'));
