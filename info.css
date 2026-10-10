@@ -17,7 +17,7 @@ html{scroll-behavior:smooth}
 .info-section p{margin:10px 0}.info-section p:last-child{margin-bottom:0}
 .info-section ul,.info-section ol{padding-left:21px;margin:10px 0}
 .info-section a,.info-aside a{color:var(--brand);text-underline-offset:3px}
-.info-aside .btn.primary{color:var(--surface);text-decoration:none}
+.info-aside .btn.primary{color:var(--on-brand);text-decoration:none}
 .info-aside{align-self:start;position:sticky;top:22px;background:var(--brand-soft);border:1px solid var(--line);border-radius:22px;padding:23px}
 .info-aside h2{font-size:17px;margin:0 0 12px}.info-aside p{font-size:14px;line-height:1.6;color:var(--muted);margin:0 0 17px}.info-aside .btn{display:block;text-align:center;text-decoration:none}
 .info-footer{border-top:1px solid var(--line);padding:25px 0 40px;display:flex;justify-content:space-between;align-items:center;gap:20px;color:var(--muted);font-size:13px}

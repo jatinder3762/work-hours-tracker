@@ -25,12 +25,12 @@
 .profile-card{padding:24px}
 .profile-card .profile-fields{gap:16px}
 .form :is(.auth-error,.form-note,.profile-message){grid-column:1/-1}
-/* Quiet white surfaces and solid blue accents. */
+/* Consistent navy surfaces and ice blue accents. */
 body,.info-site,.splash{background:var(--page-bg)}
 .brand-symbol,.welcome-logo,.profile-avatar,.month-bar,.daily-bar,.splash-bars i{background:var(--brand)}
 .welcome-preview,.profile-hero,.welcome-steps{background:var(--surface)}
 .welcome-copy h1 span{background:none;color:var(--brand);-webkit-text-fill-color:var(--brand)}
-.period-card{background:var(--brand)}
+.period-card{background:var(--hero);color:var(--hero-ink)}
 :is(#app,.modal) .btn{border-radius:8px}
 :is(#app,.modal) .btn.primary{border:1px solid var(--brand)}
 :is(#app,.modal) .form .btn:not(:disabled):hover,:is(#app,.modal) .modal-actions .btn:not(:disabled):hover{transform:none}
