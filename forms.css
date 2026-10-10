@@ -67,3 +67,5 @@ body,.info-site,.splash{background:var(--page-bg)}
   #reportsView .report-filters{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
   #reportsView .toolbar-right{width:100%;grid-template-columns:minmax(0,1fr)}
 }
+
+#app .shift-delete{width:100%;min-height:48px;border:1px solid var(--danger);background:var(--surface);color:var(--danger);margin:0}

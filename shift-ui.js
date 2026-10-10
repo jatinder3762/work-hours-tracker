@@ -3,6 +3,9 @@ window.initShiftUI=()=>{
   const saveButton=document.getElementById('saveBtn');
   if(!form||!saveButton)return;
   const editor=$('shiftEditor'), action=$('shiftAction'), summary=$('selectedShiftSummary'), choices=$('shiftChoices');
+  const deleteButton=document.createElement('button');
+  deleteButton.id='deleteShift';deleteButton.type='button';deleteButton.className='btn shift-delete';deleteButton.textContent='Delete shift';deleteButton.hidden=true;
+  form.querySelector('.shift-form-actions').after(deleteButton);
   action.hidden=true;
   editor.hidden=false;
   let actionRequest=0;
@@ -33,6 +36,8 @@ window.initShiftUI=()=>{
     }
     form.querySelectorAll('input,select').forEach(field=>field.disabled=saving||editorLocked);
     saveButton.disabled=saving||editorLocked||!state.valid||!isDirty();
+    deleteButton.hidden=!shift||editorLocked;
+    deleteButton.disabled=saving||editorLocked;
   };
   // Guard navigation before its existing handlers run; no shift data is changed here.
   document.addEventListener('click',event=>{
@@ -144,6 +149,45 @@ window.initShiftUI=()=>{
     }finally{if(token===actionRequest)editor.removeAttribute('aria-busy')}
   };
   $('cancelEdit').onclick=()=>{if(saving||!allowDiscard())return;baseline=snapshot();updateEditor()};
+
+  deleteButton.onclick=async()=>{
+    const shift=shifts.find(item=>item.id===editing&&item.workplaceId===current?.id);
+    if(saving||editorLocked||!shift||!user)return;
+    if(!navigator.onLine){msg('Reconnect before deleting this shift.',true);return}
+    const prompt=`Delete the saved shift on ${dt(shift.date).toLocaleDateString()} (${shift.start}–${shift.end})? This cannot be undone.${isDirty()?' Unsaved edits will also be discarded.':''}`;
+    if(!confirm(prompt))return;
+    const ownerId=user.id,workplaceId=current.id,shiftId=shift.id;
+    saving=true;syncForm();deleteButton.classList.add('is-loading');deleteButton.textContent='Deleting…';form.setAttribute('aria-busy','true');msg('');
+    let deleted=false;
+    const verifyDeleted=async()=>{
+      const {data,error}=await sb.from('shifts').select('id').eq('id',shiftId).eq('user_id',ownerId).eq('workplace_id',workplaceId).limit(1);
+      return !error&&Array.isArray(data)&&data.length===0;
+    };
+    try{
+      const {data:locked,error:lockError}=await sb.from('pay_periods').select('period_start').eq('workplace_id',workplaceId).eq('user_id',ownerId).eq('paid',true).lte('period_start',shift.date).gte('period_end',shift.date).limit(1);
+      if(lockError)throw lockError;
+      if(locked?.length){editorLocked=true;saveButton.hidden=true;msg('This shift is in a paid period. Unlock the period before deleting it.',true);return}
+      try{
+        const {data,error}=await sb.from('shifts').delete().eq('id',shiftId).eq('user_id',ownerId).eq('workplace_id',workplaceId)
+          .eq('shift_date',shift.date).eq('start_time',shift.start).eq('end_time',shift.end).eq('break_minutes',shift.breakMin).select('id');
+        if(error)throw error;
+        deleted=Array.isArray(data)&&data.some(row=>row.id===shiftId);
+        if(!deleted)deleted=await verifyDeleted();
+        if(!deleted)throw Error('This saved shift changed. Select its date again before deleting it.');
+      }catch(error){
+        if(!deleted){try{deleted=await verifyDeleted()}catch(_error){}}
+        if(!deleted)throw error;
+      }
+      shifts=shifts.filter(item=>item.id!==shiftId);
+      saving=false;cancel();renderDash();renderReports();renderWork();
+      await load();await updateEditor();
+      msg('Shift deleted. Hours and earnings have been updated.');
+    }catch(error){
+      msg(deleted?'Shift deleted. Refresh to reload the latest totals.':error.message||'Unable to delete the shift. Refresh and try again.',true);
+    }finally{
+      saving=false;deleteButton.classList.remove('is-loading');deleteButton.textContent='Delete shift';form.removeAttribute('aria-busy');syncForm();
+    }
+  };
 
   const startDate=()=>current?.pay_anchor_date||'';
   const dateError=(date,today=day(new Date()))=>{
