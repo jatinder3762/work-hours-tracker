@@ -290,7 +290,7 @@ window.initPayPeriodUI=()=>{
     summary=document.createElement('section');
     summary.id='paySummary';
     summary.className='card pay-summary';
-    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Earned (estimated)</small><strong id="periodEarned">—</strong></div><div><small>Received</small><strong id="periodReceived">—</strong></div><div><small>Remaining (est.)</small><strong id="periodRemaining">—</strong></div></div><p class="pay-summary-caption">Amounts belong to this pay period. Estimates use gross rates; paycheck deductions may change actual pay.</p><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
+    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Current hours</small><strong id="currentHoursTotal">—</strong></div><div><small>Estimated earnings</small><strong id="periodEarned">—</strong></div><div class="summary-pending"><small>Current pending hours</small><strong id="pendingHoursTotal">—</strong></div></div><p class="pay-summary-caption">Amounts belong to this pay period. Estimates use gross rates; paycheck deductions may change actual pay.</p><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p>';
     $('workChartSlot').replaceWith(summary);
     const summaryActions=document.createElement('div');
     summaryActions.className='pay-summary-actions';
@@ -357,12 +357,13 @@ window.initPayPeriodUI=()=>{
     ensureSummary();
     currentPeriodRecord=null;
     $('currentPeriodShare').disabled=true;
-    ['periodEarned','periodReceived','periodRemaining'].forEach(id=>$(id).textContent='—');
+    ['periodEarned','pendingHoursTotal'].forEach(id=>$(id).textContent='—');
     $('paySummaryState').textContent='Loading payment status…';
     const workplaceId=current.id;
     const range=period(current);
     const all=ws(workplaceId);
     const currentList=periodShifts(current,range);
+    $('currentHoursTotal').textContent=shiftHours(currentList).toFixed(2)+' h';
     let rateHelp=document.getElementById('rateHelp');
     if(!rateHelp){
       rateHelp=document.createElement('div');
@@ -381,8 +382,6 @@ window.initPayPeriodUI=()=>{
     $('workEarn').textContent=has(currentList)?cash(total(currentList)):'—';
     $('workFreq').textContent=freq(current.pay_frequency);
     $('currentPeriodDates').textContent=`${formatDate(range.start)} – ${formatDate(range.end)}`;
-    $('allTimeHoursTotal').textContent=shiftHours(all).toFixed(2)+' h';
-    $('allTimeEarningsTotal').textContent=has(all)?cash(total(all)):'—';
 
     const currentAction=$('currentPeriodAction');
     currentAction.disabled=true;
@@ -392,21 +391,12 @@ window.initPayPeriodUI=()=>{
       if(error)throw error;
       if(!current||current.id!==workplaceId||requestId!==summaryRequest)return;
       const periods=data||[];
-      const currentPending=outstanding(currentList,periods.find(item=>item.period_start===range.start&&item.period_end===range.end));
       calendarStatusWorkId=workplaceId;
       calendarStatusRows=periods;
       calendarStatusLoaded=true;
       paintCalendarStatus();
-      const paidPeriods=periods.filter(item=>item.paid);
-      const partialPeriods=periods.filter(item=>!item.paid&&+item.amount_received>0);
-      const paidList=all.filter(shift=>paidPeriods.some(item=>shift.date>=item.period_start&&shift.date<=item.period_end));
-      const partialHours=partialPeriods.reduce((sum,item)=>sum+partialProgress(all.filter(shift=>shift.date>=item.period_start&&shift.date<=item.period_end),item.amount_received).covered,0);
-      $('paidHoursTotal').textContent=(shiftHours(paidList)+partialHours).toFixed(2)+' h';
-      $('paidEarningsTotal').textContent=has(paidList)?cash(total(paidList)):'—';
       currentPeriodRecord=periods.find(item=>item.period_start===range.start&&item.period_end===range.end)||null;
       $('periodEarned').textContent=has(currentList)?cash(total(currentList)):currentList.length?'Rate needed':cash(0);
-      $('periodReceived').textContent=cash(+currentPeriodRecord?.amount_received||0);
-      $('periodRemaining').textContent=currentPending==null?(currentList.length?'Rate needed':cash(0)):cash(currentPending);
       $('paySummaryState').textContent=currentList.length?'':'No shifts recorded in this pay period.';
       window.refreshShiftEditor?.();
       const currentCovered=currentPeriodRecord?.paid?shiftHours(currentList):partialProgress(currentList,currentPeriodRecord?.amount_received).covered;

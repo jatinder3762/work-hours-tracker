@@ -46,7 +46,8 @@
 .calendar-actions { display:grid; grid-template-columns:48px 1fr 1fr 48px; gap:8px; width:100%; }
 #workplaceView .calendar-card .calendar-actions .btn { min-height:48px; padding:8px 5px; font-size:12px; }
 .calendar-card>.card-head { gap:16px; }
-.pay-money-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; padding:20px 0; margin-top:16px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.pay-money-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; padding:20px 0; margin-top:16px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+.pay-money-grid .summary-pending { grid-column:1/-1; padding-top:16px; border-top:1px solid var(--line); }
 .pay-money-grid small,.pay-money-grid strong { display:block; }
 .pay-money-grid small { font-size:12px; color:var(--muted); }
 .pay-money-grid strong { margin-top:7px; font-size:22px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
