@@ -290,7 +290,7 @@ window.initPayPeriodUI=()=>{
     summary=document.createElement('section');
     summary.id='paySummary';
     summary.className='card pay-summary';
-    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Current hours</small><strong id="currentHoursTotal">—</strong></div><div><small>Estimated earnings</small><strong id="periodEarned">—</strong></div><div class="summary-pending"><small>Current pending hours</small><strong id="pendingHoursTotal">—</strong></div></div><p class="pay-summary-caption">Amounts belong to this pay period. Estimates use gross rates; paycheck deductions may change actual pay.</p><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p>';
+    summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Current hours</small><strong id="currentHoursTotal">—</strong></div><div><small>Estimated earnings</small><strong id="periodEarned">—</strong></div></div><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p>';
     $('workChartSlot').replaceWith(summary);
     const summaryActions=document.createElement('div');
     summaryActions.className='pay-summary-actions';
@@ -357,7 +357,7 @@ window.initPayPeriodUI=()=>{
     ensureSummary();
     currentPeriodRecord=null;
     $('currentPeriodShare').disabled=true;
-    ['periodEarned','pendingHoursTotal'].forEach(id=>$(id).textContent='—');
+    $('periodEarned').textContent='—';
     $('paySummaryState').textContent='Loading payment status…';
     const workplaceId=current.id;
     const range=period(current);
@@ -399,8 +399,6 @@ window.initPayPeriodUI=()=>{
       $('periodEarned').textContent=has(currentList)?cash(total(currentList)):currentList.length?'Rate needed':cash(0);
       $('paySummaryState').textContent=currentList.length?'':'No shifts recorded in this pay period.';
       window.refreshShiftEditor?.();
-      const currentCovered=currentPeriodRecord?.paid?shiftHours(currentList):partialProgress(currentList,currentPeriodRecord?.amount_received).covered;
-      $('pendingHoursTotal').textContent=Math.max(0,shiftHours(currentList)-currentCovered).toFixed(2)+' h';
       const isPaid=!!currentPeriodRecord?.paid;
       const badge=$('currentPeriodStatus');
       const action=$('currentPeriodAction');
