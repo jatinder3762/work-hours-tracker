@@ -20,6 +20,19 @@ window.initPayPeriodUI=()=>{
   const moneyFromCents=value=>Math.max(0,value)/100;
   const outstanding=(list,item)=>item?.paid?0:has(list)?moneyFromCents(cents(total(list))-cents(item?.amount_received)):null;
   const sharePeriod=window.createPeriodSharing({h,dt,formatRange});
+  // Both entry points use the same image and a fresh payment balance.
+  const shareWorkPeriod=(work,item,button)=>sharePeriod({work,range:item,shifts:[],button,loadDetails:async()=>{
+    const {data,error}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',work.id);
+    if(error)throw Error('Unable to check pending payments. Please try sharing again.');
+    const fresh=buildPeriodHistory(work,ws(work.id).map(shift=>shift.date),data||[],period(work));
+    const range=fresh.find(row=>row.period_start===item.period_start&&row.period_end===item.period_end);
+    if(!range)throw Error('This pay period changed. Refresh the pay history before sharing.');
+    const earlier=fresh.filter(row=>!row.paid&&row.period_end<range.period_start)
+      .map(row=>{const entries=periodShifts(work,{start:row.period_start,end:row.period_end});return {...row,pending:outstanding(entries,row),hasShifts:entries.length>0}})
+      .filter(row=>row.hasShifts&&(row.pending==null||row.pending>0))
+      .sort((a,b)=>a.period_start.localeCompare(b.period_start));
+    return {range,shifts:periodShifts(work,{start:range.period_start,end:range.period_end}),earlier};
+  }});
   const buildPeriodHistory=(work,shiftDates,savedPeriods,currentRange)=>{
     // Preserve paid and partially paid ranges. Regenerate untouched unpaid rows
     // from the current schedule so old week anchors cannot count shifts twice.
@@ -181,7 +194,7 @@ window.initPayPeriodUI=()=>{
   $('cancelPaymentChoice').onclick=closeChoice;
   choiceModal.onclick=event=>{if(event.target===choiceModal)closeChoice()};
   const choiceError=message=>{$('paymentChoiceError').textContent=message;$('paymentChoiceError').hidden=false};
-  const refreshPaymentViews=async()=>{await Promise.all([renderPay(),updateWorkSummary()]);enhanceDashboard()};
+  const refreshPaymentViews=async()=>{await Promise.all([renderPay(),updateWorkSummary(),refreshPaymentOverview()]);enhanceDashboard()};
   const saveReceipt=async(item,work,additional,paid)=>{
     const received=moneyFromCents(cents(item.amount_received)+cents(additional));
     const changes={amount_received:received,paid,paid_at:paid?new Date().toISOString():null};
@@ -278,12 +291,22 @@ window.initPayPeriodUI=()=>{
     summary.id='paySummary';
     summary.className='card pay-summary';
     summary.innerHTML='<div class="pay-summary-head"><div><p class="eyebrow">PAY SUMMARY</p><h2 id="currentPeriodDates">Current pay period</h2><span id="currentPeriodStatus" class="badge warning">Unpaid</span></div><button id="currentPeriodAction" class="btn primary">Record payment</button></div><div class="pay-money-grid"><div><small>Earned (estimated)</small><strong id="periodEarned">—</strong></div><div><small>Received</small><strong id="periodReceived">—</strong></div><div><small>Remaining (est.)</small><strong id="periodRemaining">—</strong></div></div><p class="pay-summary-caption">Amounts belong to this pay period. Estimates use gross rates; paycheck deductions may change actual pay.</p><p id="paySummaryState" class="pay-summary-state" role="status" aria-live="polite"></p><div class="pay-summary-grid"><div><small>Paid hours (estimated)</small><strong id="paidHoursTotal">0.00 h</strong></div><div><small>Current pending hours</small><strong id="pendingHoursTotal">0.00 h</strong></div><div><small>Fully paid earnings (est.)</small><strong id="paidEarningsTotal">CA$0.00</strong></div><div><small>All-time hours</small><strong id="allTimeHoursTotal">0.00 h</strong></div><div><small>All-time earnings</small><strong id="allTimeEarningsTotal">CA$0.00</strong></div></div>';
-    document.querySelector('#workplaceView .workspace-grid')?.insertAdjacentElement('afterend',summary);
+    $('workChartSlot').replaceWith(summary);
+    const summaryActions=document.createElement('div');
+    summaryActions.className='pay-summary-actions';
+    $('currentPeriodAction').before(summaryActions);
+    summaryActions.appendChild($('currentPeriodAction'));
+    summaryActions.insertAdjacentHTML('beforeend','<button id="currentPeriodShare" type="button" class="btn secondary" disabled>↗ Share</button>');
+    $('currentPeriodShare').onclick=function(){
+      if(!current)return;
+      const range=period(current);
+      shareWorkPeriod(current,{period_start:range.start,period_end:range.end},this);
+    };
     const carryover=document.createElement('section');
     carryover.id='carryoverSummary';carryover.className='card carryover-summary';carryover.hidden=true;
     carryover.innerHTML='<div class="card-head"><div><p class="eyebrow">OUTSTANDING PAY</p><h2>Earlier balance and this period</h2></div><button id="carryoverAll" type="button" class="btn secondary">View payments</button></div><div class="carryover-totals"><div><small>Current period pending (est.)</small><strong id="carryCurrent">—</strong></div><div><small>Earlier periods pending (est.)</small><strong id="carryEarlier">—</strong></div><div><small>Combined outstanding (est.)</small><strong id="carryCombined">—</strong></div></div><div id="carryoverRows" class="carryover-rows"></div><p class="muted carryover-note">Previous balances stay with their original periods. Estimates compare gross earnings with recorded receipts; deductions may change your actual pay.</p>';
-    summary.insertAdjacentElement('afterend',carryover);
-    $('carryoverAll').onclick=()=>{$('payBtn').click()};
+    $('paymentContent').appendChild(carryover);
+    $('carryoverAll').onclick=()=>{if($('periodHistory').hidden)$('paymentPeriodsToggle').click();$('periodHistory').scrollIntoView({behavior:'smooth',block:'start'})};
     document.getElementById('currentPeriodAction').onclick=markCurrentPaid;
     return summary;
   };
@@ -332,7 +355,8 @@ window.initPayPeriodUI=()=>{
     if(!current)return;
     const requestId=++summaryRequest;
     ensureSummary();
-    $('carryoverSummary').hidden=true;
+    currentPeriodRecord=null;
+    $('currentPeriodShare').disabled=true;
     ['periodEarned','periodReceived','periodRemaining'].forEach(id=>$(id).textContent='—');
     $('paySummaryState').textContent='Loading payment status…';
     const workplaceId=current.id;
@@ -368,30 +392,7 @@ window.initPayPeriodUI=()=>{
       if(error)throw error;
       if(!current||current.id!==workplaceId||requestId!==summaryRequest)return;
       const periods=data||[];
-      const earlier=buildPeriodHistory(current,all.map(shift=>shift.date),periods,range)
-        .filter(item=>!item.paid&&item.period_end<range.start)
-        .map(item=>({item,list:periodShifts(current,{start:item.period_start,end:item.period_end})}))
-        .filter(entry=>entry.list.length);
       const currentPending=outstanding(currentList,periods.find(item=>item.period_start===range.start&&item.period_end===range.end));
-      const earlierAmounts=earlier.map(({item,list})=>outstanding(list,item));
-      const earlierPending=earlierAmounts.every(amount=>amount!=null)?earlierAmounts.reduce((sum,amount)=>sum+cents(amount),0)/100:null;
-      $('carryoverSummary').hidden=!earlier.length;
-      $('carryCurrent').textContent=currentPending==null?'—':cash(currentPending);
-      $('carryEarlier').textContent=earlierPending==null?'—':cash(earlierPending);
-      $('carryCombined').textContent=currentPending==null||earlierPending==null?'—':cash(moneyFromCents(cents(currentPending)+cents(earlierPending)));
-      $('carryoverRows').replaceChildren();
-      earlier.slice(0,3).forEach(({item,list})=>{
-        const line=document.createElement('div');line.className='carryover-row';
-        const details=document.createElement('div');
-        const title=document.createElement('strong');title.textContent=formatRange(item.period_start,item.period_end);
-        const note=document.createElement('small');
-        const due=outstanding(list,item);
-        note.textContent=`${statusName(item)} · ${shiftHours(list).toFixed(2)} h · ${due==null?'Rate needed for estimate':cash(due)+' estimated balance'}`;
-        details.append(title,note);
-        const action=document.createElement('button');action.type='button';action.className='btn secondary';action.textContent='Add payment';
-        action.onclick=()=>openPaymentChoice(item,list,current,true);
-        line.append(details,action);$('carryoverRows').appendChild(line);
-      });
       calendarStatusWorkId=workplaceId;
       calendarStatusRows=periods;
       calendarStatusLoaded=true;
@@ -419,12 +420,12 @@ window.initPayPeriodUI=()=>{
       action.className='btn '+(isPaid?'secondary':'primary');
       action.dataset.paid=String(isPaid);
     }catch(error){if(requestId===summaryRequest){calendarStatusLoaded=false;paintCalendarStatus();$('paySummaryState').textContent='Unable to load payment status. Open pay history to retry.';msg(error.message||'Unable to load pay status.',true)}}
-    finally{if(current?.id===workplaceId&&requestId===summaryRequest){currentAction.disabled=!currentList.length||!calendarStatusLoaded;currentAction.classList.remove('is-loading')}}
+    finally{if(current?.id===workplaceId&&requestId===summaryRequest){currentAction.disabled=!currentList.length||!calendarStatusLoaded;currentAction.classList.remove('is-loading');$('currentPeriodShare').disabled=!currentList.length||!calendarStatusLoaded}}
   };
 
   async function markCurrentPaid(){
     if(!current)return;
-    if(this.dataset.paid==='true'){$('payBtn').click();return;}
+    if(this.dataset.paid==='true'){$('payBtn').click();$('paymentPeriodsToggle').click();return;}
     const range=period(current);
     const list=periodShifts(current,range);
     if(!list.length){msg('Add at least one shift before marking this period paid.',true);return;}
@@ -446,29 +447,145 @@ window.initPayPeriodUI=()=>{
     const button=$(id),previousClick=button.onclick;
     button.onclick=function(...args){browsingCalendar=true;try{return previousClick.apply(this,args)}finally{browsingCalendar=false}};
   }
-  renderWork=function(){baseRenderWork();if(!browsingCalendar){updateWorkSummary();renderPay()}};
+  renderWork=function(){baseRenderWork();if(!browsingCalendar)updateWorkSummary()};
+
+  let paymentWorkId='',paymentMonth=new Date(),overviewRequest=0;
+  const paymentWork=()=>works.find(work=>work.id===paymentWorkId);
+  const paymentPage=document.createElement('section');
+  paymentPage.id='paymentView';paymentPage.className='view page payments-page';paymentPage.hidden=true;
+  paymentPage.innerHTML='<div class="page-heading"><div><p class="eyebrow">YOUR PAYMENTS</p><h1>Payment</h1><p class="muted">Review earnings and manage payments for each workplace.</p></div></div><div class="card payment-filter"><label for="paymentWork">Workplace<select id="paymentWork"><option value="">Select workplace</option></select></label></div><div id="paymentEmpty" class="card empty"><h2>Choose a workplace</h2><p class="muted">Select a workplace to view payments.</p></div><div id="paymentContent" hidden><section class="card payment-month-card"><div class="card-head"><h2 id="paymentMonthLabel">Month at a glance</h2><div class="payment-month-actions"><button id="paymentPrevMonth" type="button" class="btn secondary icon-only" aria-label="Previous payment month">‹</button><button id="paymentThisMonth" type="button" class="btn secondary">This month</button><button id="paymentNextMonth" type="button" class="btn secondary icon-only" aria-label="Next payment month">›</button></div></div><div id="paymentOverviewSlot"></div><button id="paymentPeriodsToggle" type="button" class="btn primary" aria-expanded="false" aria-controls="periodHistory">View pay periods</button></section><p id="paymentState" class="muted" role="status" aria-live="polite"></p></div>';
+  $('reportsView').before(paymentPage);
+  const paymentNav=document.createElement('button');paymentNav.id='paymentNav';paymentNav.className='nav-item';paymentNav.innerHTML='<span aria-hidden="true">$</span> Payment';
+  $('reportsNav').before(paymentNav);
+  const mobilePayment=document.createElement('button');mobilePayment.id='mPayment';mobilePayment.className='btn';mobilePayment.textContent='Payment';
+  $('mReports').before(mobilePayment);
+  const previousShow=show;
+  show=function(id){
+    paymentPage.hidden=id!=='paymentView';
+    previousShow(id);
+    paymentNav.classList.toggle('active',id==='paymentView');
+    mobilePayment.classList.toggle('active',id==='paymentView');
+  };
+  const fillPaymentWorkplaces=()=>{
+    const select=$('paymentWork');select.replaceChildren(new Option('Select workplace',''));
+    works.slice().sort((a,b)=>Number(!!a.archived)-Number(!!b.archived)||a.name.localeCompare(b.name)).forEach(work=>{
+      select.add(new Option(work.name+(work.archived?' (archived)':''),work.id));
+    });
+    select.value=paymentWorkId;
+  };
+  const hidePaymentHistory=()=>{
+    payRequest++;
+    visiblePeriods=12;
+    $('periodHistory').hidden=true;
+    $('periodRows').replaceChildren();
+    $('paymentPeriodsToggle').setAttribute('aria-expanded','false');
+    $('paymentPeriodsToggle').textContent='View pay periods';
+  };
+  const renderPaymentMonth=()=>{
+    const work=paymentWork();if(!work)return;
+    $('paymentMonthLabel').textContent=paymentMonth.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    window.renderPaymentMonthOverview?.(work,paymentMonth);
+  };
+  const refreshPaymentOverview=async()=>{
+    const work=paymentWork();if(!work||paymentPage.hidden)return;
+    const request=++overviewRequest;
+    renderPaymentMonth();
+    $('carryoverSummary').hidden=true;
+    $('paymentState').textContent='Loading payment balances…';
+    try{
+      const {data,error}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',work.id);
+      if(error)throw error;
+      if(request!==overviewRequest||paymentWorkId!==work.id)return;
+      const range=period(work),rows=data||[];
+      const earlier=buildPeriodHistory(work,ws(work.id).map(shift=>shift.date),rows,range)
+        .filter(item=>!item.paid&&item.period_end<range.start)
+        .map(item=>({item,list:periodShifts(work,{start:item.period_start,end:item.period_end})}))
+        .filter(({item,list})=>list.length&&(outstanding(list,item)==null||outstanding(list,item)>0));
+      const currentPending=outstanding(periodShifts(work,range),rows.find(item=>item.period_start===range.start&&item.period_end===range.end));
+      const amounts=earlier.map(({item,list})=>outstanding(list,item));
+      const earlierPending=amounts.every(amount=>amount!=null)?amounts.reduce((sum,amount)=>sum+cents(amount),0)/100:null;
+      $('carryoverSummary').hidden=!earlier.length;
+      $('carryCurrent').textContent=currentPending==null?'—':cash(currentPending);
+      $('carryEarlier').textContent=earlierPending==null?'—':cash(earlierPending);
+      $('carryCombined').textContent=currentPending==null||earlierPending==null?'—':cash(moneyFromCents(cents(currentPending)+cents(earlierPending)));
+      $('carryoverRows').replaceChildren();
+      earlier.slice(0,3).forEach(({item,list})=>{
+        const line=document.createElement('div');line.className='carryover-row';
+        const details=document.createElement('div'),title=document.createElement('strong'),note=document.createElement('small');
+        title.textContent=formatRange(item.period_start,item.period_end);
+        const due=outstanding(list,item);
+        note.textContent=`${statusName(item)} · ${shiftHours(list).toFixed(2)} h · ${due==null?'Rate needed for estimate':cash(due)+' estimated balance'}`;
+        details.append(title,note);
+        const action=document.createElement('button');action.type='button';action.className='btn secondary';action.textContent='Add payment';
+        action.onclick=()=>openPaymentChoice(item,list,work,true);
+        line.append(details,action);$('carryoverRows').appendChild(line);
+      });
+      $('paymentState').textContent='';
+    }catch(error){if(request===overviewRequest)$('paymentState').textContent='Unable to load balances. Select the workplace again to retry.'}
+  };
+  const selectPaymentWorkplace=()=>{
+    overviewRequest++;
+    paymentWorkId=$('paymentWork').value;
+    paymentMonth=new Date();
+    hidePaymentHistory();
+    $('carryoverSummary').hidden=true;
+    $('paymentState').textContent='';
+    $('paymentContent').hidden=!paymentWork();
+    $('paymentEmpty').hidden=!!paymentWork();
+    refreshPaymentOverview();
+  };
+  const openPaymentPage=(workId='')=>{
+    paymentWorkId=workId;fillPaymentWorkplaces();show('paymentView');selectPaymentWorkplace();
+    window.scrollTo({top:0,behavior:'smooth'});
+  };
+  paymentNav.onclick=()=>openPaymentPage();mobilePayment.onclick=()=>openPaymentPage();
+  $('paymentWork').onchange=selectPaymentWorkplace;
+  for(const [id,offset] of [['paymentPrevMonth',-1],['paymentNextMonth',1]])$(id).onclick=()=>{
+    paymentMonth=new Date(paymentMonth.getFullYear(),paymentMonth.getMonth()+offset,1);renderPaymentMonth();
+  };
+  $('paymentThisMonth').onclick=()=>{paymentMonth=new Date();renderPaymentMonth()};
+  $('paymentPeriodsToggle').onclick=async()=>{
+    const opening=$('periodHistory').hidden;
+    if(!opening){hidePaymentHistory();return}
+    $('periodHistory').hidden=false;
+    $('paymentPeriodsToggle').setAttribute('aria-expanded','true');
+    $('paymentPeriodsToggle').textContent='Hide pay periods';
+    await renderPay();
+  };
+  window.addEventListener('mytracker:data-ready',()=>{
+    if(paymentPage.hidden)return;
+    fillPaymentWorkplaces();
+    if(!paymentWork()){selectPaymentWorkplace();return}
+    refreshPaymentOverview();renderPay();
+  });
+  window.addEventListener('mytracker:auth',event=>{
+    if(event.detail?.session)return;
+    paymentWorkId='';overviewRequest++;hidePaymentHistory();
+    $('paymentContent').hidden=true;$('paymentEmpty').hidden=false;
+  });
 
   const history=document.createElement('section');
   history.id='periodHistory';
   history.className='card period-history';
   history.hidden=true;
-  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Pay periods</h2></div></div><div id="historyContent"><p class="muted">The calendar shows weekly totals. Record Paid, Partial, or Unpaid for each original pay period below. Only fully paid periods lock shifts; unlocking requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
-  document.querySelector('#workplaceView .workspace-grid').insertAdjacentElement('afterend',history);
+  history.innerHTML='<div class="card-head"><div><p class="eyebrow">PAY HISTORY</p><h2>Pay periods</h2></div></div><div id="historyContent"><p class="muted">All pay periods for this workplace appear below with their full dates, including periods that cross months. Record Paid, Partial, or Unpaid for each original period. Only fully paid periods lock shifts; unlocking requires your account password.</p><div class="table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Worked hours</th><th>Estimated gross</th><th>Payment details</th><th>Status / share</th></tr></thead><tbody id="periodRows"></tbody></table></div><button type="button" id="historyMore" class="btn secondary" hidden>Show earlier periods</button></div>';
+  $('paymentContent').appendChild(history);
   let visiblePeriods=12;
   $('historyMore').onclick=async function(){visiblePeriods+=12;this.disabled=true;this.classList.add('is-loading');try{await renderPay()}finally{this.disabled=false;this.classList.remove('is-loading')}};
-  $('payBtn').textContent='Pay periods';
-  $('payBtn').onclick=()=>{$('periodHistory').hidden=false;$('periodHistory').scrollIntoView({behavior:'smooth',block:'start'})};
+  $('payBtn').textContent='Payment';
+  $('payBtn').onclick=()=>openPaymentPage(current?.id||'');
 
   let payRequest=0;
   renderPay=async function(){
-    if(!current)return;
-    const request=++payRequest,work=current,workplaceId=work.id;
+    const work=paymentWork();
+    if(!work||paymentPage.hidden||history.hidden)return;
+    const request=++payRequest,workplaceId=work.id;
     if(!$('payModal').hidden)$('payPeriods').innerHTML='<div class="list-loading"><span class="spinner"></span> Loading pay periods…</div>';
     if(!$('historyContent').hidden)$('periodRows').innerHTML='<tr><td colspan="6"><span class="spinner"></span> Loading pay periods…</td></tr>';
     let data,error;
     try{({data,error}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',workplaceId).order('period_start',{ascending:false}))}
     catch(cause){error=cause}
-    if(request!==payRequest||!current||current.id!==workplaceId)return;
+    if(request!==payRequest||paymentWorkId!==workplaceId)return;
     if(error){$('payPeriods').innerHTML='<p class="auth-error">Unable to load pay periods.</p>';$('periodRows').innerHTML='<tr><td colspan="6">Unable to load pay periods.</td></tr>';return}
     const periods=buildPeriodHistory(work,ws(workplaceId).map(shift=>shift.date),data||[],period(work));
     $('payPeriods').innerHTML='';
@@ -513,18 +630,7 @@ window.initPayPeriodUI=()=>{
       const bindChoices=container=>container.querySelectorAll('.pay-status-choice').forEach(button=>{button.onclick=function(){onAction(this,this.dataset.status)}});
       bindChoices(row);
       const bindShare=container=>{container.querySelector('.period-share-action').onclick=function(){
-        sharePeriod({work,range:item,shifts:list,button:this,loadDetails:async()=>{
-          const {data:saved,error:shareError}=await sb.from('pay_periods').select('*').eq('user_id',user.id).eq('workplace_id',workplaceId);
-          if(shareError)throw Error('Unable to check pending payments. Please try sharing again.');
-          const fresh=buildPeriodHistory(work,ws(workplaceId).map(shift=>shift.date),saved||[],period(work));
-          const range=fresh.find(row=>row.period_start===item.period_start&&row.period_end===item.period_end);
-          if(!range)throw Error('This pay period changed. Refresh the pay history before sharing.');
-          const earlier=fresh.filter(row=>!row.paid&&row.period_end<range.period_start)
-            .map(row=>{const entries=periodShifts(work,{start:row.period_start,end:row.period_end});return {...row,pending:outstanding(entries,row),hasShifts:entries.length>0}})
-            .filter(row=>row.hasShifts&&(row.pending==null||row.pending>0))
-            .sort((a,b)=>a.period_start.localeCompare(b.period_start));
-          return {range,shifts:periodShifts(work,{start:range.period_start,end:range.period_end}),earlier};
-        }});
+        shareWorkPeriod(work,item,this);
       }};
       bindShare(row);
       if(index<24)$('payPeriods').appendChild(row);

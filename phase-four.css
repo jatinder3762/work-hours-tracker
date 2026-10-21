@@ -93,3 +93,22 @@
   .payment-choices { grid-template-columns:1fr 1fr; }
 }
 @media(prefers-reduced-motion:reduce) { #app .btn,.modal .btn { transition:none; } }
+
+/* Pay summary replaces the chart above work entry; payments have their own view. */
+#workplaceView #paySummary { margin:0 0 20px; }
+.pay-summary-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.payment-month-card { margin-bottom:20px; }
+.payment-month-actions { display:flex; gap:8px; }
+.payment-month-card>.card-head { flex-wrap:wrap; gap:12px; }
+#paymentOverviewSlot .calendar-overview { padding:0; margin:18px 0; border:0; background:transparent; box-shadow:none; }
+#paymentState:empty { display:none; }
+#paymentView .payment-filter label { max-width:600px; }
+#mobileNav .btn { min-width:0; }
+@media(max-width:720px) {
+  .pay-summary-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  #app .pay-summary-actions .btn { padding-inline:8px; min-width:0; }
+  .payment-month-card>.card-head { align-items:stretch; }
+  .payment-month-actions { width:100%; display:grid; grid-template-columns:48px 1fr 48px; }
+  #paymentPeriodsToggle { width:100%; }
+  #mobileNav .btn { font-size:11px; padding-inline:2px!important; }
+}

@@ -24,7 +24,7 @@ window.initChartUI=()=>{
   monthOverview.className='calendar-overview';
   monthOverview.hidden=true;
   monthOverview.innerHTML='<div class="calendar-overview-head"><div><p class="eyebrow">MONTH AT A GLANCE</p><h3 id="overviewRange"></h3></div><div class="overview-totals"><div><small>Hours worked</small><strong id="overviewHours"></strong></div><div><small>Estimated gross</small><strong id="overviewEarnings"></strong></div></div></div><div id="dailyBars" class="daily-bars"></div><div id="dailyTicks" class="daily-ticks" aria-hidden="true"></div><p id="overviewHint" class="overview-hint" hidden></p>';
-  document.getElementById('workChartSlot').appendChild(monthOverview);
+  document.getElementById('paymentOverviewSlot').appendChild(monthOverview);
 
   function renderDashboardChart(){
     const active=new Set(works.filter(work=>!work.archived).map(work=>work.id));
@@ -56,28 +56,28 @@ window.initChartUI=()=>{
     });
   }
 
-  function renderMonthOverview(){
-    if(!current){monthOverview.hidden=true;return}
+  function renderMonthOverview(work,date){
+    if(!work){monthOverview.hidden=true;return}
     monthOverview.hidden=false;
-    const year=viewDate.getFullYear(),month=viewDate.getMonth(),count=new Date(year,month+1,0).getDate();
-    const relevant=ws(current.id).filter(shift=>shift.date.slice(0,7)===monthKey(viewDate));
+    const year=date.getFullYear(),month=date.getMonth(),count=new Date(year,month+1,0).getDate();
+    const relevant=ws(work.id).filter(shift=>shift.date.slice(0,7)===monthKey(date));
     const daily=Array.from({length:count},()=>0);
     relevant.forEach(shift=>{daily[Number(shift.date.slice(8))-1]+=h(shift)});
     const max=Math.max(1,...daily),bars=document.getElementById('dailyBars'),ticks=document.getElementById('dailyTicks');
     bars.replaceChildren();ticks.replaceChildren();
     bars.style.setProperty('--day-count',count);
     ticks.style.setProperty('--day-count',count);
-    document.getElementById('overviewRange').textContent=`${viewDate.toLocaleDateString(undefined,{month:'short'})} 1–${count}`;
+    document.getElementById('overviewRange').textContent=`${date.toLocaleDateString(undefined,{month:'short'})} 1–${count}`;
     document.getElementById('overviewHours').textContent=`${hours(relevant).toFixed(2)} h`;
     document.getElementById('overviewEarnings').textContent=has(relevant)?cash(total(relevant)):'—';
     const hint=document.getElementById('overviewHint');
     hint.hidden=!!relevant.length&&has(relevant);
     hint.textContent=relevant.length?'Add a pay rate to see complete estimated earnings.':'No shifts recorded this month.';
     bars.setAttribute('role','img');
-    bars.setAttribute('aria-label',`${viewDate.toLocaleDateString(undefined,{month:'long',year:'numeric'})} hours by day: ${daily.map((value,index)=>value?`${index+1}: ${value.toFixed(2)} hours`:null).filter(Boolean).join('; ')||'no hours recorded'}`);
+    bars.setAttribute('aria-label',`${date.toLocaleDateString(undefined,{month:'long',year:'numeric'})} hours by day: ${daily.map((value,index)=>value?`${index+1}: ${value.toFixed(2)} hours`:null).filter(Boolean).join('; ')||'no hours recorded'}`);
     daily.forEach((value,index)=>{
       const column=document.createElement('span');
-      column.className='daily-column'+(day(new Date(year,month,index+1))===selected?' is-selected':'');
+      column.className='daily-column';
       const bar=document.createElement('span');
       bar.className='daily-bar';
       bar.style.height=value?`${Math.max(5,value/max*100)}%`:'0';
@@ -91,6 +91,5 @@ window.initChartUI=()=>{
 
   const previousDash=renderDash;
   renderDash=function(){previousDash();renderDashboardChart()};
-  const previousCalendar=calendar;
-  calendar=function(items){previousCalendar(items);renderMonthOverview()};
+  window.renderPaymentMonthOverview=renderMonthOverview;
 };
