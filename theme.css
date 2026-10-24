@@ -1,29 +1,31 @@
-/* Midnight navy and ice blue: shared across every My Tracker surface. */
+/* Sky and white: one fixed, shared palette across My Tracker. */
 :root {
-  color-scheme:dark;
-  --on-brand:#071e34;
-  --hero:#1c486d;
-  --hero-ink:#edf5fc;
-  --brand:#8bc8ef;
-  --brand-hover:#b2ddf7;
-  --brand-aqua:#6baed6;
-  --brand-soft:#193d5d;
-  --brand-ring:#a3d9fa;
-  --page-bg:#071e34;
-  --surface:#112d49;
-  --ink:#edf5fc;
-  --muted:#afc4d8;
-  --line:#365875;
-  --success:#8fdfb5;
-  --success-soft:#153e36;
-  --success-line:#4d9374;
-  --warning:#f1cf81;
-  --warning-soft:#413923;
-  --warning-line:#947e49;
-  --danger:#ffadba;
-  --danger-soft:#442c3e;
-  --danger-line:#9f6075;
-  --overlay:rgba(2,12,24,.76);
+  color-scheme:light;
+  --on-brand:#ffffff;
+  --hero:#deedfa;
+  --hero-ink:#17334f;
+  --brand:#317bb5;
+  --brand-hover:#24699f;
+  --brand-aqua:#397fa8;
+  --brand-soft:#e3f0fb;
+  --brand-ring:#317bb5;
+  --page-bg:#edf5fc;
+  --surface:#ffffff;
+  --chrome:#deedfa;
+  --logo:#abd7f3;
+  --ink:#17334f;
+  --muted:#526b83;
+  --line:#cfdfed;
+  --success:#206a48;
+  --success-soft:#e3f5eb;
+  --success-line:#96c5aa;
+  --warning:#7c570f;
+  --warning-soft:#fff2d5;
+  --warning-line:#d9ba73;
+  --danger:#b32f4c;
+  --danger-soft:#fff0f3;
+  --danger-line:#dfa3b1;
+  --overlay:rgba(23,51,79,.38);
   --blue:var(--brand);
   --blue2:var(--brand-aqua);
   --aqua:var(--brand-aqua);
@@ -34,6 +36,6 @@
   --bg:var(--page-bg);
   --soft:var(--brand-soft);
   --white:var(--surface);
-  --shadow:0 14px 38px rgba(2,12,24,.3);
+  --shadow:0 10px 28px rgba(23,51,79,.08);
   --radius:14px;
 }

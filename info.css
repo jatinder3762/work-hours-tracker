@@ -1,4 +1,4 @@
-@import url('./style.css');
+@import url('./style.css?v=sky5500');
 html{scroll-behavior:smooth}
 .info-site{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(circle at 90% 0,var(--line) 0,transparent 30%),var(--surface)}
 .info-header,.info-main,.info-footer{width:min(1060px,calc(100% - 40px));margin-inline:auto}

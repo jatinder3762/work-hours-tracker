@@ -27,7 +27,8 @@
 .form :is(.auth-error,.form-note,.profile-message){grid-column:1/-1}
 /* Consistent navy surfaces and ice blue accents. */
 body,.info-site,.splash{background:var(--page-bg)}
-.brand-symbol,.welcome-logo,.profile-avatar,.month-bar,.daily-bar,.splash-bars i{background:var(--brand)}
+.profile-avatar,.month-bar,.daily-bar,.splash-bars i{background:var(--brand)}
+.brand-symbol,.welcome-logo{background:var(--logo);color:var(--ink)}
 .welcome-preview,.profile-hero,.welcome-steps{background:var(--surface)}
 .welcome-copy h1 span{background:none;color:var(--brand);-webkit-text-fill-color:var(--brand)}
 .period-card{background:var(--hero);color:var(--hero-ink)}
