@@ -34,7 +34,8 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
       grouped.get(shift.date).push(shift);
     });
     const days=[...grouped.entries()];
-    const rowCount=Math.max(1,days.length);
+    // Reserve a separate time line for every shift, including split shifts.
+    const detailHeight=Math.max(45,days.reduce((sum,[,list])=>sum+48+list.length*24,0));
     const amount=list=>list.every(shift=>shift.rate!=null&&Number.isFinite(+shift.rate))
       ?Math.round(list.reduce((sum,shift)=>sum+h(shift)*+shift.rate,0)*100)/100:null;
     const earnings=amount(shifts),received=Math.max(0,+range.amount_received||0);
@@ -44,7 +45,7 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     const money=value=>value==null?'Unavailable':new Intl.NumberFormat('en-CA',{style:'currency',currency:'CAD',currencyDisplay:'code'}).format(value).replace('CAD','CA$');
     const priorHeight=100+earlier.length*54;
     const currentTop=(earlier.length?364+priorHeight:344)+39;
-    const dailyTop=currentTop+239,footerY=dailyTop+49+rowCount*45;
+    const dailyTop=currentTop+239,footerY=dailyTop+49+detailHeight;
     const width=760,height=footerY+55;
     const canvas=document.createElement('canvas');
     canvas.width=width*2;canvas.height=height*2;
@@ -110,11 +111,17 @@ window.createPeriodSharing=({h,dt,formatRange})=>{
     write('WORK DETAILS',64,dailyTop,'bold 14px Arial, sans-serif',color('brand'));
     ctx.fillStyle=color('line');ctx.fillRect(64,dailyTop+16,632,1);
     if(!days.length)write('No shifts logged for this period',64,dailyTop+49,'17px Arial, sans-serif',color('muted'));
-    days.forEach(([date,list],index)=>{
-      const y=dailyTop+49+index*45;
+    let detailY=dailyTop+49;
+    days.forEach(([date,list])=>{
+      const y=detailY;
       write(dt(date).toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'}),64,y,'17px Arial, sans-serif',color('ink'),470);
       ctx.textAlign='right';write(list.reduce((sum,shift)=>sum+h(shift),0).toFixed(2)+' h',696,y,'bold 18px Arial, sans-serif',color('ink'));ctx.textAlign='left';
-      ctx.fillStyle=color('line');ctx.fillRect(64,y+16,632,1);
+      list.forEach((shift,index)=>{
+        const start=shift.start.slice(0,5),end=shift.end.slice(0,5);
+        write(`${start} – ${end}${end<start?' (next day)':''}`,64,y+25+index*24,'17px Arial, sans-serif',color('muted'),632);
+      });
+      ctx.fillStyle=color('line');ctx.fillRect(64,y+37+(list.length-1)*24,632,1);
+      detailY+=48+list.length*24;
     });
     write('Amounts are estimates · As of '+new Date().toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}),64,footerY,'13px Arial, sans-serif',color('muted'),632);
     const blob=await new Promise((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(Error('Could not create the report image.')),'image/png'));
